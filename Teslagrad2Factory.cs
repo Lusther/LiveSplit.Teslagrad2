@@ -12,7 +12,7 @@ namespace LiveSplit.Teslagrad2
         public ComponentCategory Category => ComponentCategory.Control;
 
         public string UpdateName => ComponentName;
-        public string UpdateURL => "";
+        public string UpdateURL => "https://raw.githubusercontent.com/Lusther/LiveSplit.Teslagrad2/main/";
         public string XMLURL => UpdateURL + "Components/Updates.xml";
         public Version Version => Assembly.GetExecutingAssembly().GetName().Version;
 

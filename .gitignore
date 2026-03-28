@@ -1,0 +1,36 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.vspscc
+*.vssscc
+.vs/
+
+## NuGet
+packages/
+*.nupkg
+
+## Build
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+## Local config
+Directory.Build.props
+
+## IDE
+.vscode/
+
+## OS
+Thumbs.db
+.DS_Store

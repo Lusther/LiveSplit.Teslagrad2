@@ -15,10 +15,8 @@ namespace LiveSplit.Teslagrad2
         {
             this.pnlTop = new System.Windows.Forms.Panel();
             this.chkAutoReset = new System.Windows.Forms.CheckBox();
-            this.btnAdd = new System.Windows.Forms.Button();
             this.lblNote = new System.Windows.Forms.Label();
             this.pnlRows = new System.Windows.Forms.Panel();
-            this.dropIndicator = new System.Windows.Forms.Panel();
             this.pnlTop.SuspendLayout();
             this.SuspendLayout();
 
@@ -26,7 +24,6 @@ namespace LiveSplit.Teslagrad2
             this.pnlTop.Location = new System.Drawing.Point(0, 0);
             this.pnlTop.Size = new System.Drawing.Size(415, 30);
             this.pnlTop.Controls.Add(this.chkAutoReset);
-            this.pnlTop.Controls.Add(this.btnAdd);
             this.pnlTop.Controls.Add(this.lblNote);
 
             // chkAutoReset
@@ -36,16 +33,9 @@ namespace LiveSplit.Teslagrad2
             this.chkAutoReset.Name = "chkAutoReset";
             this.chkAutoReset.Text = "Auto Reset";
 
-            // btnAdd
-            this.btnAdd.Location = new System.Drawing.Point(100, 2);
-            this.btnAdd.Name = "btnAdd";
-            this.btnAdd.Size = new System.Drawing.Size(90, 24);
-            this.btnAdd.Text = "+ Add Split";
-            this.btnAdd.FlatStyle = System.Windows.Forms.FlatStyle.System;
-
             // lblNote
             this.lblNote.AutoSize = true;
-            this.lblNote.Location = new System.Drawing.Point(200, 7);
+            this.lblNote.Location = new System.Drawing.Point(100, 7);
             this.lblNote.Name = "lblNote";
             this.lblNote.ForeColor = System.Drawing.Color.Gray;
             this.lblNote.Text = "Variable: Teslagrad2_Version";
@@ -55,13 +45,6 @@ namespace LiveSplit.Teslagrad2
             this.pnlRows.Size = new System.Drawing.Size(415, 280);
             this.pnlRows.AutoScroll = true;
             this.pnlRows.Name = "pnlRows";
-            this.pnlRows.AllowDrop = true;
-
-            // dropIndicator
-            this.dropIndicator.BackColor = System.Drawing.Color.DodgerBlue;
-            this.dropIndicator.Size = new System.Drawing.Size(400, 2);
-            this.dropIndicator.Visible = false;
-            this.pnlRows.Controls.Add(this.dropIndicator);
 
             // Teslagrad2Settings
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -77,9 +60,7 @@ namespace LiveSplit.Teslagrad2
 
         private System.Windows.Forms.Panel pnlTop;
         private System.Windows.Forms.CheckBox chkAutoReset;
-        private System.Windows.Forms.Button btnAdd;
         private System.Windows.Forms.Label lblNote;
         private System.Windows.Forms.Panel pnlRows;
-        private System.Windows.Forms.Panel dropIndicator;
     }
 }

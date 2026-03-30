@@ -58,6 +58,7 @@ namespace LiveSplit.Teslagrad2
     public enum SplitType
     {
         StartTimer,
+        ManualSplit,
 
         // Skills
         Blink,
@@ -95,6 +96,7 @@ namespace LiveSplit.Teslagrad2
             switch (type)
             {
                 case SplitType.StartTimer: return "Start Timer";
+                case SplitType.ManualSplit: return "Manual Split";
                 case SplitType.Blink: return "Blink";
                 case SplitType.BlueCloak: return "Blue Cloak";
                 case SplitType.Waterblink: return "Water Blink";
@@ -145,6 +147,8 @@ namespace LiveSplit.Teslagrad2
                     return "Bosses";
                 case SplitType.Scrolls:
                     return "Scrolls";
+                case SplitType.ManualSplit:
+                    return "General";
                 case SplitType.SceneEntered:
                     return "Scene";
                 default:

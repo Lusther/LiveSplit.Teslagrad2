@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using System.Xml;
+using LiveSplit.Model;
 
 namespace LiveSplit.Teslagrad2
 {
@@ -13,32 +15,26 @@ namespace LiveSplit.Teslagrad2
 
         private const int ROW_HEIGHT = 28;
         private readonly List<Panel> _rowPanels = new List<Panel>();
-
-        private int _dragIndex = -1;
-        private int _dropIndex = -1;
-        private Rectangle _dragBox;
+        private readonly LiveSplitState _state;
         private Font _headerFont;
 
-        public Teslagrad2Settings()
+        public Teslagrad2Settings(LiveSplitState state)
         {
+            _state = state;
             Splits = new List<SplitEntry>
             {
-                new SplitEntry(SplitType.StartTimer),
-                new SplitEntry(SplitType.Elenor)
+                new SplitEntry(SplitType.StartTimer)
             };
             AutoReset = true;
             InitializeComponent();
             WireEvents();
+            SyncWithRun();
             RebuildRows();
         }
 
         private void WireEvents()
         {
             chkAutoReset.CheckedChanged += (s, e) => AutoReset = chkAutoReset.Checked;
-            btnAdd.Click += OnAdd;
-            pnlRows.DragOver += OnPanelDragOver;
-            pnlRows.DragDrop += OnPanelDragDrop;
-            pnlRows.DragLeave += OnPanelDragLeave;
             this.Load += (s, e) => FitToParent();
             this.ParentChanged += (s, e) => FitToParent();
             this.SizeChanged += (s, e) => LayoutPanels();
@@ -75,6 +71,81 @@ namespace LiveSplit.Teslagrad2
             pnlRows.Size = new Size(ClientSize.Width, ClientSize.Height - pnlTop.Bottom);
         }
 
+        #region Sync
+
+        public void SyncWithRun()
+        {
+            var run = _state?.Run;
+            if (run == null || run.Count == 0) return;
+
+            int segmentCount = run.Count;
+            var runNames = new List<string>(segmentCount);
+            for (int i = 0; i < segmentCount; i++)
+                runNames.Add(run[i].Name);
+
+            // Get stored segment names (skip StartTimer at index 0)
+            var storedNames = new List<string>(Splits.Count - 1);
+            for (int i = 1; i < Splits.Count; i++)
+                storedNames.Add(Splits[i].SegmentName);
+
+            // Already in sync?
+            if (storedNames.Count == runNames.Count && storedNames.SequenceEqual(runNames))
+                return;
+
+            // First sync (no stored names)? Assign by position.
+            bool firstSync = storedNames.All(n => n == null);
+            if (firstSync)
+            {
+                while (Splits.Count - 1 < segmentCount)
+                    Splits.Add(new SplitEntry(SplitType.ManualSplit));
+                while (Splits.Count - 1 > segmentCount)
+                    Splits.RemoveAt(Splits.Count - 1);
+                for (int i = 0; i < segmentCount; i++)
+                    Splits[i + 1].SegmentName = runNames[i];
+                RebuildRows();
+                return;
+            }
+
+            // Build name -> entry map for matching
+            var byName = new Dictionary<string, SplitEntry>();
+            for (int i = 1; i < Splits.Count; i++)
+            {
+                if (Splits[i].SegmentName != null && !byName.ContainsKey(Splits[i].SegmentName))
+                    byName[Splits[i].SegmentName] = Splits[i];
+            }
+
+            var runNameSet = new HashSet<string>(runNames);
+
+            var newSplits = new List<SplitEntry> { Splits[0] }; // keep StartTimer
+            for (int i = 0; i < segmentCount; i++)
+            {
+                string name = runNames[i];
+                if (byName.TryGetValue(name, out var match))
+                {
+                    // Exact name match - reuse entry
+                    match.SegmentName = name;
+                    newSplits.Add(match);
+                    byName.Remove(name);
+                }
+                else if (i < storedNames.Count && storedNames[i] != null && !runNameSet.Contains(storedNames[i]))
+                {
+                    // Same position, old name gone from run -> rename
+                    Splits[i + 1].SegmentName = name;
+                    newSplits.Add(Splits[i + 1]);
+                }
+                else
+                {
+                    // New segment -> placeholder
+                    newSplits.Add(new SplitEntry(SplitType.ManualSplit, segmentName: name));
+                }
+            }
+
+            Splits = newSplits;
+            RebuildRows();
+        }
+
+        #endregion
+
         #region Row Building
 
         private void RebuildRows()
@@ -96,7 +167,6 @@ namespace LiveSplit.Teslagrad2
             }
 
             UpdateRowPositions();
-            dropIndicator.BringToFront();
             pnlRows.ResumeLayout();
         }
 
@@ -117,7 +187,7 @@ namespace LiveSplit.Teslagrad2
 
         private Panel CreateRow(int index)
         {
-            var row = new Panel { Height = ROW_HEIGHT, Width = 380, Tag = index };
+            var row = new Panel { Height = ROW_HEIGHT, Width = 450, Tag = index };
             PopulateRowControls(row, index);
             return row;
         }
@@ -137,27 +207,8 @@ namespace LiveSplit.Teslagrad2
         {
             var entry = Splits[index];
             bool isStart = index == 0;
-            bool isEnd = index == Splits.Count - 1;
-            bool isDraggable = !isStart && !isEnd;
 
             int x = 4;
-
-            if (isDraggable)
-            {
-                var handle = new Label
-                {
-                    Text = "\u2261",
-                    Location = new Point(x, 4),
-                    Size = new Size(18, 20),
-                    Cursor = Cursors.SizeAll,
-                    ForeColor = Color.Gray,
-                    Tag = index
-                };
-                handle.MouseDown += OnHandleMouseDown;
-                handle.MouseMove += OnHandleMouseMove;
-                row.Controls.Add(handle);
-            }
-            x += 20;
 
             if (isStart)
             {
@@ -172,6 +223,19 @@ namespace LiveSplit.Teslagrad2
             }
             else
             {
+                // Segment name label
+                string segmentName = entry.SegmentName ?? $"Segment {index}";
+                var nameLabel = new Label
+                {
+                    Text = segmentName,
+                    Location = new Point(x, 5),
+                    Size = new Size(120, 20),
+                    AutoEllipsis = true,
+                    ForeColor = Color.FromArgb(80, 80, 80)
+                };
+                row.Controls.Add(nameLabel);
+                x += 125;
+
                 var combo = new ComboBox
                 {
                     DropDownStyle = ComboBoxStyle.DropDownList,
@@ -210,7 +274,6 @@ namespace LiveSplit.Teslagrad2
                     };
                     nud.ValueChanged += OnRowScrollIdChanged;
                     row.Controls.Add(nud);
-                    x += 55;
                 }
                 else if (entry.Type == SplitType.SceneEntered)
                 {
@@ -223,24 +286,6 @@ namespace LiveSplit.Teslagrad2
                     };
                     txt.Leave += OnRowSceneNameChanged;
                     row.Controls.Add(txt);
-                    x += 125;
-                }
-
-                if (isDraggable)
-                {
-                    var btn = new Button
-                    {
-                        Text = "\u00D7",
-                        Location = new Point(x, 2),
-                        Size = new Size(24, 22),
-                        Tag = index,
-                        FlatStyle = FlatStyle.Flat,
-                        ForeColor = Color.Gray,
-                        Cursor = Cursors.Hand
-                    };
-                    btn.FlatAppearance.BorderSize = 0;
-                    btn.Click += OnRowRemove;
-                    row.Controls.Add(btn);
                 }
             }
         }
@@ -332,23 +377,6 @@ namespace LiveSplit.Teslagrad2
             Splits[index].SceneName = txt.Text.Trim();
         }
 
-        private void OnRowRemove(object sender, EventArgs e)
-        {
-            var btn = (Button)sender;
-            int index = (int)btn.Tag;
-            if (index <= 0 || index >= Splits.Count - 1) return;
-
-            Splits.RemoveAt(index);
-
-            pnlRows.SuspendLayout();
-            var row = _rowPanels[index];
-            pnlRows.Controls.Remove(row);
-            row.Dispose();
-            _rowPanels.RemoveAt(index);
-            UpdateRowPositions();
-            pnlRows.ResumeLayout();
-        }
-
         private void OnComboMouseWheel(object sender, MouseEventArgs e)
         {
             if (e is HandledMouseEventArgs he)
@@ -394,110 +422,6 @@ namespace LiveSplit.Teslagrad2
 
         #endregion
 
-        #region Drag and Drop
-
-        private void OnHandleMouseDown(object sender, MouseEventArgs e)
-        {
-            if (e.Button != MouseButtons.Left) return;
-
-            var handle = (Label)sender;
-            _dragIndex = (int)handle.Tag;
-
-            var dragSize = SystemInformation.DragSize;
-            var screenPos = handle.PointToScreen(e.Location);
-            _dragBox = new Rectangle(
-                screenPos.X - dragSize.Width / 2,
-                screenPos.Y - dragSize.Height / 2,
-                dragSize.Width, dragSize.Height);
-        }
-
-        private void OnHandleMouseMove(object sender, MouseEventArgs e)
-        {
-            if (e.Button != MouseButtons.Left || _dragBox == Rectangle.Empty) return;
-
-            var handle = (Label)sender;
-            var screenPos = handle.PointToScreen(e.Location);
-            if (!_dragBox.Contains(screenPos))
-            {
-                pnlRows.DoDragDrop(_dragIndex, DragDropEffects.Move);
-                _dragBox = Rectangle.Empty;
-            }
-        }
-
-        private void OnPanelDragOver(object sender, DragEventArgs e)
-        {
-            e.Effect = DragDropEffects.Move;
-            Point clientPoint = pnlRows.PointToClient(new Point(e.X, e.Y));
-            int scrollOffset = pnlRows.VerticalScroll.Value;
-            int targetIndex = (clientPoint.Y + scrollOffset + ROW_HEIGHT / 2) / ROW_HEIGHT;
-
-            targetIndex = Math.Max(1, Math.Min(targetIndex, Splits.Count - 1));
-
-            if (_dropIndex != targetIndex)
-            {
-                _dropIndex = targetIndex;
-                dropIndicator.Location = new Point(0, targetIndex * ROW_HEIGHT - scrollOffset - 1);
-                dropIndicator.Visible = true;
-            }
-        }
-
-        private void OnPanelDragDrop(object sender, DragEventArgs e)
-        {
-            dropIndicator.Visible = false;
-
-            if (_dragIndex < 1 || _dropIndex < 1 || _dragIndex == _dropIndex)
-            {
-                _dragIndex = -1;
-                _dropIndex = -1;
-                return;
-            }
-
-            var entry = Splits[_dragIndex];
-            Splits.RemoveAt(_dragIndex);
-            int insertAt = _dropIndex;
-            if (_dragIndex < _dropIndex)
-                insertAt--;
-            insertAt = Math.Max(1, Math.Min(insertAt, Splits.Count - 1));
-            Splits.Insert(insertAt, entry);
-
-            var row = _rowPanels[_dragIndex];
-            _rowPanels.RemoveAt(_dragIndex);
-            _rowPanels.Insert(insertAt, row);
-
-            pnlRows.SuspendLayout();
-            UpdateRowPositions();
-            pnlRows.ResumeLayout();
-
-            _dragIndex = -1;
-            _dropIndex = -1;
-        }
-
-        private void OnPanelDragLeave(object sender, EventArgs e)
-        {
-            _dropIndex = -1;
-            dropIndicator.Visible = false;
-        }
-
-        #endregion
-
-        #region Add
-
-        private void OnAdd(object sender, EventArgs e)
-        {
-            int insertAt = Splits.Count - 1;
-            Splits.Insert(insertAt, new SplitEntry(SplitType.Blink));
-
-            pnlRows.SuspendLayout();
-            var row = CreateRow(insertAt);
-            _rowPanels.Insert(insertAt, row);
-            pnlRows.Controls.Add(row);
-            UpdateRowPositions();
-            dropIndicator.BringToFront();
-            pnlRows.ResumeLayout();
-        }
-
-        #endregion
-
         #region Serialization
 
         public XmlNode GetSettings(XmlDocument document)
@@ -517,6 +441,8 @@ namespace LiveSplit.Teslagrad2
                     splitNode.SetAttribute("ScrollId", entry.ScrollId.ToString());
                 if (entry.Type == SplitType.SceneEntered)
                     splitNode.SetAttribute("SceneName", entry.SceneName ?? "");
+                if (entry.SegmentName != null)
+                    splitNode.SetAttribute("SegmentName", entry.SegmentName);
                 splitsNode.AppendChild(splitNode);
             }
             parent.AppendChild(splitsNode);
@@ -530,7 +456,7 @@ namespace LiveSplit.Teslagrad2
             AutoReset = autoResetNode != null && bool.TryParse(autoResetNode.InnerText, out bool ar) ? ar : true;
 
             var splitsNode = node["Splits"];
-            if (splitsNode != null && splitsNode.ChildNodes.Count >= 2)
+            if (splitsNode != null && splitsNode.ChildNodes.Count >= 1)
             {
                 Splits.Clear();
                 foreach (XmlNode child in splitsNode.ChildNodes)
@@ -547,17 +473,21 @@ namespace LiveSplit.Teslagrad2
                         if (sceneAttr != null)
                             sceneName = sceneAttr.Value;
 
-                        Splits.Add(new SplitEntry(type, scrollId, sceneName));
+                        string segmentName = null;
+                        var segAttr = child.Attributes?["SegmentName"];
+                        if (segAttr != null)
+                            segmentName = segAttr.Value;
+
+                        Splits.Add(new SplitEntry(type, scrollId, sceneName, segmentName));
                     }
                 }
 
                 if (Splits.Count == 0 || Splits[0].Type != SplitType.StartTimer)
                     Splits.Insert(0, new SplitEntry(SplitType.StartTimer));
-                if (Splits.Count < 2)
-                    Splits.Add(new SplitEntry(SplitType.Elenor));
             }
 
             chkAutoReset.Checked = AutoReset;
+            SyncWithRun();
             RebuildRows();
         }
 

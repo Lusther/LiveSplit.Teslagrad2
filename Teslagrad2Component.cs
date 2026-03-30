@@ -38,13 +38,15 @@ namespace LiveSplit.Teslagrad2
         {
             _state = state;
             _timer = new TimerModel { CurrentState = state };
-            _settings = new Teslagrad2Settings();
+            _settings = new Teslagrad2Settings(state);
             _memory = new Teslagrad2Memory();
             Log.Info("Component loaded.");
         }
 
         public void Update(IInvalidator invalidator, LiveSplitState state, float width, float height, LayoutMode mode)
         {
+            _settings.SyncWithRun();
+
             if (!_memory.TryHook())
             {
                 if (_hooked)
@@ -139,6 +141,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.Halvtann: return BecameTrue(_memory.HalvtannBeaten);
                 case SplitType.Galvan: return BecameTrue(_memory.GalvanBeaten);
                 case SplitType.Troll: return BecameTrue(_memory.TrollBeaten);
+                case SplitType.ManualSplit: return false;
                 case SplitType.Elenor: return _memory.IsElenorDead();
 
                 case SplitType.Scrolls:

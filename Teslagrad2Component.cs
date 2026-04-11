@@ -134,6 +134,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.OmniBlink: return BecameTrue(_memory.OmniBlinkUnlocked);
                 case SplitType.DoubleJump: return BecameTrue(_memory.DoubleJumpUnlocked);
                 case SplitType.SecretsMap: return BecameTrue(_memory.SecretsMapUnlocked);
+                case SplitType.Map: return BecameTrue(_memory.MapUnlocked);
 
                 case SplitType.Hulder: return BecameTrue(_memory.HulderBeaten);
                 case SplitType.Moose: return BecameTrue(_memory.MooseBeaten);

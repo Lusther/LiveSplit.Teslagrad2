@@ -31,6 +31,8 @@ namespace LiveSplit.Teslagrad2
         public MemoryWatcher<bool> RedCloakUnlocked { get; private set; }
         public MemoryWatcher<bool> OmniBlinkUnlocked { get; private set; }
         public MemoryWatcher<bool> DoubleJumpUnlocked { get; private set; }
+        public MemoryWatcher<bool> SecretsMapUnlocked { get; private set; }
+        public MemoryWatcher<bool> MapUnlocked { get; private set; }
 
         // Bosses
         public MemoryWatcher<bool> HulderBeaten { get; private set; }
@@ -41,7 +43,6 @@ namespace LiveSplit.Teslagrad2
         public MemoryWatcher<bool> TrollBeaten { get; private set; }
 
         // Other
-        public MemoryWatcher<bool> SecretsMapUnlocked { get; private set; }
         public MemoryWatcher<int> ScrollCount { get; private set; }
         public MemoryWatcher<bool> InElenorFight { get; private set; }
         public MemoryWatcher<int> SaveSlotCount { get; private set; }
@@ -140,6 +141,8 @@ namespace LiveSplit.Teslagrad2
             RedCloakUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x4B)) { Name = "red_cloak" };
             OmniBlinkUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x4C)) { Name = "omni_blink" };
             DoubleJumpUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x4D)) { Name = "double_jump" };
+            SecretsMapUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x4E)) { Name = "secrets_map" };
+            MapUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x4F)) { Name = "map" };
 
             HulderBeaten = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x51)) { Name = "hulder" };
             MooseBeaten = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x52)) { Name = "moose" };
@@ -148,7 +151,6 @@ namespace LiveSplit.Teslagrad2
             GalvanBeaten = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x55)) { Name = "galvan" };
             TrollBeaten = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x56)) { Name = "troll" };
 
-            SecretsMapUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x4E)) { Name = "secrets_map" };
             ScrollCount = new MemoryWatcher<int>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x80, 0x18)) { Name = "scroll_count" };
             InElenorFight = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, scene, 0xB8, 0x69)) { Name = "in_elenor_fight" };
             SaveSlotCount = new MemoryWatcher<int>(new DeepPointer(MODULE_NAME, file, 0xB8, 0x0, 0x10, 0x18)) { Name = "save_slot_count" };
@@ -160,9 +162,9 @@ namespace LiveSplit.Teslagrad2
             {
                 BlinkUnlocked, BlueCloakUnlocked, WaterblinkUnlocked, MjolnirUnlocked,
                 PowerSlideUnlocked, AxeUnlocked, BlinkWireAxeUnlocked, RedCloakUnlocked,
-                OmniBlinkUnlocked, DoubleJumpUnlocked,
+                OmniBlinkUnlocked, DoubleJumpUnlocked, SecretsMapUnlocked, MapUnlocked,
                 HulderBeaten, MooseBeaten, FafnirBeaten, HalvtannBeaten, GalvanBeaten, TrollBeaten,
-                SecretsMapUnlocked, ScrollCount, InElenorFight, SaveSlotCount
+                ScrollCount, InElenorFight, SaveSlotCount
             };
         }
 

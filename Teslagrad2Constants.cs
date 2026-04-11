@@ -72,6 +72,7 @@ namespace LiveSplit.Teslagrad2
         OmniBlink,
         DoubleJump,
         SecretsMap,
+        Map,
 
         // Bosses
         Hulder,
@@ -108,6 +109,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.OmniBlink: return "OmniBlink";
                 case SplitType.DoubleJump: return "Double Jump";
                 case SplitType.SecretsMap: return "Secrets Map";
+                case SplitType.Map: return "Map";
                 case SplitType.Hulder: return "Hulder";
                 case SplitType.Moose: return "Moose";
                 case SplitType.Fafnir: return "Fafnir";
@@ -136,6 +138,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.OmniBlink:
                 case SplitType.DoubleJump:
                 case SplitType.SecretsMap:
+                case SplitType.Map:
                     return "Skills";
                 case SplitType.Hulder:
                 case SplitType.Moose:

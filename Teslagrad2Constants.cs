@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
+using LiveSplit.UI.Components;
+using static System.Math;
 
 namespace LiveSplit.Teslagrad2
 {
@@ -22,6 +25,32 @@ namespace LiveSplit.Teslagrad2
             BaseSaveDataFile = saveDataFile;
         }
     }
+
+    public enum ScrollCollection
+    {
+        Vikings,
+        Teslamancers,
+        Goo,
+        Clash,
+        Huldr,
+        Lumina,
+        None
+    }
+
+    public class ScrollCollectionTotal
+    {
+        public int CollectionTotal {get; }
+        public int CumulatedTotalBefore {get; }
+        public int CumulatedTotalAfter {get; }
+
+        public ScrollCollectionTotal(int collectionTotal, int cumulatedTotalBefore, int cumulatedTotalAfter)
+        {
+            CollectionTotal = collectionTotal;
+            CumulatedTotalBefore = cumulatedTotalBefore;
+            CumulatedTotalAfter = cumulatedTotalAfter;
+        }
+    }
+
 
     public static class Teslagrad2Constants
     {
@@ -52,6 +81,107 @@ namespace LiveSplit.Teslagrad2
                 case GameVersion.SpeedrunPatch: return "old_version_for_speedrunning";
                 default: return "unknown";
             }
+        }
+
+        public static readonly Dictionary<ScrollCollection, ScrollCollectionTotal> ScrollCollectionTotals = new Dictionary<ScrollCollection, ScrollCollectionTotal>
+        {
+            { ScrollCollection.Vikings,       new ScrollCollectionTotal( 9,  0,  9) },
+            { ScrollCollection.Teslamancers,  new ScrollCollectionTotal( 6,  9, 15) },
+            { ScrollCollection.Goo,           new ScrollCollectionTotal(15, 15, 30) },
+            { ScrollCollection.Clash,         new ScrollCollectionTotal(27, 30, 57) },
+            { ScrollCollection.Huldr,         new ScrollCollectionTotal(12, 57, 69) },
+            { ScrollCollection.Lumina,        new ScrollCollectionTotal(12, 69, 81) }
+            // Note: The None case is dealt with in the helpers, which have default values if totals are not found
+        };
+
+        public static readonly int TotalScrollCount = ScrollCollectionTotals.Values.Sum(t => t.CollectionTotal);
+
+        static Teslagrad2Constants()
+        {
+            ValidateScrollCollectionTotals();
+        }
+
+        private static void ValidateScrollCollectionTotals()
+        {
+            int runningTotal = 0;
+            bool valid = true;
+
+            foreach (var entry in ScrollCollectionTotals.OrderBy(e => e.Value.CumulatedTotalBefore))
+            {
+                var totals = entry.Value;
+                if (totals.CumulatedTotalBefore != runningTotal)
+                {
+                    Log.Error($"Invalid scroll totals for {entry.Key}: expected CumulatedTotalBefore={runningTotal}, got {totals.CumulatedTotalBefore}.");
+                    valid = false;
+                }
+                if (totals.CumulatedTotalAfter != runningTotal + totals.CollectionTotal)
+                {
+                    Log.Error($"Invalid scroll totals for {entry.Key}: expected CumulatedTotalAfter={runningTotal + totals.CollectionTotal}, got {totals.CumulatedTotalAfter}.");
+                    valid = false;
+                }
+                runningTotal = totals.CumulatedTotalAfter;
+            }
+
+            if (runningTotal != TotalScrollCount)
+            {
+                Log.Error($"Invalid total scroll count: computed {runningTotal}, expected {TotalScrollCount}.");
+                valid = false;
+            }
+
+            if (!valid)
+            {
+                Log.Error("Scroll collection totals are inconsistent. Check Teslagrad2Constants.ScrollCollectionTotals.");
+            }
+            else
+            {
+                Log.Info("Scroll collection totals validated successfully.");
+            }
+        }
+
+        public static ScrollCollection GetScrollCollectionFromID(int scrollId)
+        {
+            foreach (var collection in ScrollCollectionTotals)
+            {
+                if (scrollId > collection.Value.CumulatedTotalBefore && scrollId <= collection.Value.CumulatedTotalAfter)
+                    return collection.Key;
+            }
+            return ScrollCollection.None;
+        }
+
+        public static ScrollCollection GetScrollCollectionFromIDOrDefault(int scrollId, ScrollCollection defaultCollection = ScrollCollection.Vikings)
+        {
+            var collection = GetScrollCollectionFromID(scrollId);
+            return collection == ScrollCollection.None ? defaultCollection : collection;
+        }
+
+        public static int GetScrollTotalNumber()
+        {
+            return TotalScrollCount;
+        }
+
+        public static int GetScrollCollectionTotal(ScrollCollection collection)
+        {
+            if (ScrollCollectionTotals.TryGetValue(collection, out var totals))
+                return totals.CollectionTotal;
+            return 0;
+        }
+
+        public static int GetScrollNumberInCollection(int scrollId, ScrollCollection collection, int defaultNumber = 1)
+        {
+            if (!ScrollCollectionTotals.TryGetValue(collection, out var totals))
+                return defaultNumber;
+            int number = scrollId - totals.CumulatedTotalBefore;
+            if (number < 1 || number > totals.CollectionTotal)
+                return defaultNumber;
+            return number;
+        }
+
+        public static int GetScrollIdForCollectionNumber(ScrollCollection collection, int number)
+        {
+            if (!ScrollCollectionTotals.TryGetValue(collection, out var totals))
+                return number;
+            number = Max(1, Min(number, totals.CollectionTotal));
+            return totals.CumulatedTotalBefore + number;
         }
     }
 
@@ -84,6 +214,7 @@ namespace LiveSplit.Teslagrad2
 
         // Scrolls
         Scrolls,
+        ScrollsByCollection,
 
         // Scene
         SceneEntered
@@ -116,6 +247,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.Elenor: return "Elenor";
                 case SplitType.Troll: return "Troll";
                 case SplitType.Scrolls: return "Scrolls";
+                case SplitType.ScrollsByCollection: return "Scrolls (by Collection)";
                 case SplitType.SceneEntered: return "Scene Entered";
                 default: return type.ToString();
             }
@@ -146,6 +278,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.Troll:
                     return "Bosses";
                 case SplitType.Scrolls:
+                case SplitType.ScrollsByCollection:
                     return "Scrolls";
                 case SplitType.ManualSplit:
                     return "General";

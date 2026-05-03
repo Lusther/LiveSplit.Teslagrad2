@@ -145,6 +145,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.Elenor: return _memory.IsElenorDead();
 
                 case SplitType.Scrolls:
+                case SplitType.ScrollsByCollection:
                     return _memory.CheckScrollCollected(entry.ScrollId);
 
                 case SplitType.SceneEntered:

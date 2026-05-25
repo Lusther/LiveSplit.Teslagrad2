@@ -281,10 +281,22 @@ namespace LiveSplit.Teslagrad2
                     {
                         Text = entry.SceneName ?? "",
                         Location = new Point(x, 3),
-                        Size = new Size(120, 21),
+                        Size = new Size(160, 21),
                         Tag = index
                     };
                     txt.Leave += OnRowSceneNameChanged;
+                    row.Controls.Add(txt);
+                }
+                else if (entry.Type == SplitType.TriggerSet)
+                {
+                    var txt = new TextBox
+                    {
+                        Text = entry.TriggerName ?? "",
+                        Location = new Point(x, 3),
+                        Size = new Size(160, 21),
+                        Tag = index
+                    };
+                    txt.Leave += OnRowTriggerNameChanged;
                     row.Controls.Add(txt);
                 }
             }
@@ -354,9 +366,11 @@ namespace LiveSplit.Teslagrad2
                 Splits[index].ScrollId = 0;
             if (item.Type != SplitType.SceneEntered)
                 Splits[index].SceneName = "";
+            if (item.Type != SplitType.TriggerSet)
+                Splits[index].TriggerName = "";
 
-            bool hadExtra = oldType == SplitType.Scrolls || oldType == SplitType.SceneEntered;
-            bool needsExtra = item.Type == SplitType.Scrolls || item.Type == SplitType.SceneEntered;
+            bool hadExtra = oldType == SplitType.Scrolls || oldType == SplitType.SceneEntered || oldType == SplitType.TriggerSet;
+            bool needsExtra = item.Type == SplitType.Scrolls || item.Type == SplitType.SceneEntered || item.Type == SplitType.TriggerSet;
             if (hadExtra || needsExtra)
                 RefreshRowControls(index);
         }
@@ -375,6 +389,14 @@ namespace LiveSplit.Teslagrad2
             int index = (int)txt.Tag;
             if (index < 0 || index >= Splits.Count) return;
             Splits[index].SceneName = txt.Text.Trim();
+        }
+
+        private void OnRowTriggerNameChanged(object sender, EventArgs e)
+        {
+            var txt = (TextBox)sender;
+            int index = (int)txt.Tag;
+            if (index < 0 || index >= Splits.Count) return;
+            Splits[index].TriggerName = txt.Text.Trim();
         }
 
         private void OnComboMouseWheel(object sender, MouseEventArgs e)
@@ -441,6 +463,8 @@ namespace LiveSplit.Teslagrad2
                     splitNode.SetAttribute("ScrollId", entry.ScrollId.ToString());
                 if (entry.Type == SplitType.SceneEntered)
                     splitNode.SetAttribute("SceneName", entry.SceneName ?? "");
+                if (entry.Type == SplitType.TriggerSet)
+                    splitNode.SetAttribute("TriggerName", entry.TriggerName ?? "");
                 if (entry.SegmentName != null)
                     splitNode.SetAttribute("SegmentName", entry.SegmentName);
                 splitsNode.AppendChild(splitNode);
@@ -473,12 +497,17 @@ namespace LiveSplit.Teslagrad2
                         if (sceneAttr != null)
                             sceneName = sceneAttr.Value;
 
+                        string triggerName = "";
+                        var trigAttr = child.Attributes?["TriggerName"];
+                        if (trigAttr != null)
+                            triggerName = trigAttr.Value;
+
                         string segmentName = null;
                         var segAttr = child.Attributes?["SegmentName"];
                         if (segAttr != null)
                             segmentName = segAttr.Value;
 
-                        Splits.Add(new SplitEntry(type, scrollId, sceneName, segmentName));
+                        Splits.Add(new SplitEntry(type, scrollId, sceneName, triggerName, segmentName));
                     }
                 }
 

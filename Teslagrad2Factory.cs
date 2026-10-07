@@ -12,8 +12,8 @@ namespace LiveSplit.Teslagrad2
         public ComponentCategory Category => ComponentCategory.Control;
 
         public string UpdateName => ComponentName;
-        public string UpdateURL => "https://raw.githubusercontent.com/Lusther/LiveSplit.Teslagrad2/main/";
-        public string XMLURL => UpdateURL + "Components/Updates.xml";
+        public string UpdateURL => "https://github.com/Lusther/LiveSplit.Teslagrad2/releases/latest/download/";
+        public string XMLURL => "https://raw.githubusercontent.com/Lusther/LiveSplit.Teslagrad2/main/Components/Updates.xml";
         public Version Version => Assembly.GetExecutingAssembly().GetName().Version;
 
         public IComponent Create(LiveSplitState state) => new Teslagrad2Component(state);

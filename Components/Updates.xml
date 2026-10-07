@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Updates>
-  <Update>
-    <Version>1.1.0.0</Version>
-    <Files>
-      <File Path="Components/LiveSplit.Teslagrad2.dll" Status="Changed" />
-    </Files>
-    <ChangeLog>
-      <![CDATA[Show segment names next to each autosplit. Splits now sync with run segments (add/remove/rename).]]>
-    </ChangeLog>
-  </Update>
-  <Update>
-    <Version>1.0.0.0</Version>
-    <Files>
-      <File Path="Components/LiveSplit.Teslagrad2.dll" Status="Changed" />
-    </Files>
-    <ChangeLog>
-      <![CDATA[Initial release - migrated from ASL script.]]>
-    </ChangeLog>
-  </Update>
-</Updates>
+<updates>
+  <update version="1.1.0.0">
+    <files>
+      <file path="LiveSplit.Teslagrad2.dll" localPath="Components/LiveSplit.Teslagrad2.dll" status="changed" />
+    </files>
+    <changelog>
+      <change>Show segment names next to each autosplit.</change>
+      <change>Splits now sync with run segments (add/remove/rename).</change>
+    </changelog>
+  </update>
+  <update version="1.0.0.0">
+    <files>
+      <file path="LiveSplit.Teslagrad2.dll" localPath="Components/LiveSplit.Teslagrad2.dll" status="changed" />
+    </files>
+    <changelog>
+      <change>Initial release - migrated from ASL script.</change>
+    </changelog>
+  </update>
+</updates>

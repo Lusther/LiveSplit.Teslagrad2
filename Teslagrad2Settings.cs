@@ -69,6 +69,7 @@ namespace LiveSplit.Teslagrad2
             pnlTop.Width = ClientSize.Width;
             pnlRows.Location = new Point(0, pnlTop.Bottom);
             pnlRows.Size = new Size(ClientSize.Width, ClientSize.Height - pnlTop.Bottom);
+            UpdateRowPositions();
         }
 
         #region Sync
@@ -172,10 +173,12 @@ namespace LiveSplit.Teslagrad2
 
         private void UpdateRowPositions()
         {
+            int width = pnlRows.ClientSize.Width > 0 ? pnlRows.ClientSize.Width : ClientSize.Width;
             for (int i = 0; i < _rowPanels.Count; i++)
             {
                 var row = _rowPanels[i];
                 row.Tag = i;
+                row.Width = width;
                 row.Location = new Point(0, i * ROW_HEIGHT);
                 foreach (Control ctrl in row.Controls)
                 {
@@ -187,7 +190,8 @@ namespace LiveSplit.Teslagrad2
 
         private Panel CreateRow(int index)
         {
-            var row = new Panel { Height = ROW_HEIGHT, Width = 450, Tag = index };
+            int width = pnlRows.ClientSize.Width > 0 ? pnlRows.ClientSize.Width : 560;
+            var row = new Panel { Height = ROW_HEIGHT, Width = width, Tag = index };
             PopulateRowControls(row, index);
             return row;
         }
@@ -263,16 +267,67 @@ namespace LiveSplit.Teslagrad2
                     row.Controls.Add(lbl);
                     x += 24;
 
+                    int maxScrolls = Teslagrad2Constants.GetScrollTotalNumber();
                     var nud = new NumericUpDown
                     {
                         Location = new Point(x, 3),
                         Size = new Size(50, 21),
                         Minimum = 1,
-                        Maximum = 100,
-                        Value = Math.Max(1, Math.Min(100, entry.ScrollId)),
+                        Maximum = maxScrolls,
+                        Value = Math.Max(1, Math.Min(maxScrolls, entry.ScrollId)),
                         Tag = index
                     };
                     nud.ValueChanged += OnRowScrollIdChanged;
+                    row.Controls.Add(nud);
+                }
+                if (entry.Type == SplitType.ScrollsByCollection)
+                {
+                    var collection = Teslagrad2Constants.GetScrollCollectionFromIDOrDefault(entry.ScrollId);
+
+                    var collectionCombo = new ComboBox
+                    {
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Location = new Point(x, 3),
+                        Size = new Size(90, 21),
+                        Tag = index
+                    };
+                    foreach (ScrollCollection collectionItem in Enum.GetValues(typeof(ScrollCollection)))
+                    {
+                        if (collectionItem == ScrollCollection.None)
+                            continue;
+                        collectionCombo.Items.Add(collectionItem);
+                    }
+                    collectionCombo.SelectedItem = collection;
+                    collectionCombo.SelectedIndexChanged += OnRowScrollCollectionChanged;
+                    collectionCombo.MouseWheel += OnComboMouseWheel;
+                    row.Controls.Add(collectionCombo);
+                    x += 95;
+
+                    var lbl = new Label
+                    {
+                        Text = "No:",
+                        Location = new Point(x, 5),
+                        AutoSize = true
+                    };
+                    row.Controls.Add(lbl);
+                    x += 25;
+
+                    int maxNumber = Teslagrad2Constants.GetScrollCollectionTotal(collection);
+                    if (maxNumber < 1)
+                        maxNumber = 1;
+
+                    int currentNumber = Teslagrad2Constants.GetScrollNumberInCollection(entry.ScrollId, collection);
+
+                    var nud = new NumericUpDown
+                    {
+                        Location = new Point(x, 3),
+                        Size = new Size(40, 21),
+                        Minimum = 1,
+                        Maximum = maxNumber,
+                        Value = Math.Max(1, Math.Min(maxNumber, currentNumber)),
+                        Tag = index
+                    };
+                    nud.ValueChanged += OnRowScrollNumberInCollectionChanged;
                     row.Controls.Add(nud);
                 }
                 else if (entry.Type == SplitType.SceneEntered)
@@ -281,7 +336,7 @@ namespace LiveSplit.Teslagrad2
                     {
                         Text = entry.SceneName ?? "",
                         Location = new Point(x, 3),
-                        Size = new Size(120, 21),
+                        Size = new Size(160, 21),
                         Tag = index
                     };
                     txt.Leave += OnRowSceneNameChanged;
@@ -348,15 +403,15 @@ namespace LiveSplit.Teslagrad2
 
             var oldType = Splits[index].Type;
             Splits[index].Type = item.Type;
-            if (item.Type == SplitType.Scrolls && Splits[index].ScrollId == 0)
+            if (item.Type.GetCategory() == SplitType.Scrolls.GetCategory() && Splits[index].ScrollId == 0)
                 Splits[index].ScrollId = 1;
-            if (item.Type != SplitType.Scrolls)
+            if (item.Type.GetCategory() != SplitType.Scrolls.GetCategory())
                 Splits[index].ScrollId = 0;
             if (item.Type != SplitType.SceneEntered)
                 Splits[index].SceneName = "";
 
-            bool hadExtra = oldType == SplitType.Scrolls || oldType == SplitType.SceneEntered;
-            bool needsExtra = item.Type == SplitType.Scrolls || item.Type == SplitType.SceneEntered;
+            bool hadExtra = oldType.GetCategory() == SplitType.Scrolls.GetCategory() || oldType == SplitType.SceneEntered;
+            bool needsExtra = item.Type.GetCategory() == SplitType.Scrolls.GetCategory() || item.Type == SplitType.SceneEntered;
             if (hadExtra || needsExtra)
                 RefreshRowControls(index);
         }
@@ -367,6 +422,31 @@ namespace LiveSplit.Teslagrad2
             int index = (int)nud.Tag;
             if (index < 0 || index >= Splits.Count) return;
             Splits[index].ScrollId = (int)nud.Value;
+        }
+
+        private void OnRowScrollNumberInCollectionChanged(object sender, EventArgs e)
+        {
+            var nud = (NumericUpDown)sender;
+            int index = (int)nud.Tag;
+            if (index < 0 || index >= Splits.Count) return;
+
+            var collection = Teslagrad2Constants.GetScrollCollectionFromIDOrDefault(Splits[index].ScrollId);
+            Splits[index].ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, (int)nud.Value);
+        }
+
+        private void OnRowScrollCollectionChanged(object sender, EventArgs e)
+        {
+            var combo = (ComboBox)sender;
+            int index = (int)combo.Tag;
+            if (index < 0 || index >= Splits.Count) return;
+            if (combo.SelectedItem == null) return;
+
+            var collection = (ScrollCollection)combo.SelectedItem;
+            var currentCollection = Teslagrad2Constants.GetScrollCollectionFromID(Splits[index].ScrollId);
+            int currentNumber = Teslagrad2Constants.GetScrollNumberInCollection(Splits[index].ScrollId, currentCollection);
+            int maxNumber = Teslagrad2Constants.GetScrollCollectionTotal(collection);
+            Splits[index].ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, Math.Min(currentNumber, maxNumber));
+            RefreshRowControls(index);
         }
 
         private void OnRowSceneNameChanged(object sender, EventArgs e)
@@ -437,7 +517,7 @@ namespace LiveSplit.Teslagrad2
             {
                 var splitNode = document.CreateElement("Split");
                 splitNode.InnerText = entry.Type.ToString();
-                if (entry.Type == SplitType.Scrolls)
+                if (entry.Type.GetCategory() == SplitType.Scrolls.GetCategory()) 
                     splitNode.SetAttribute("ScrollId", entry.ScrollId.ToString());
                 if (entry.Type == SplitType.SceneEntered)
                     splitNode.SetAttribute("SceneName", entry.SceneName ?? "");

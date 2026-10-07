@@ -22,7 +22,9 @@ namespace LiveSplit.Teslagrad2
 
             // pnlTop
             this.pnlTop.Location = new System.Drawing.Point(0, 0);
-            this.pnlTop.Size = new System.Drawing.Size(415, 30);
+            this.pnlTop.Size = new System.Drawing.Size(560, 30);
+            this.pnlTop.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+                | System.Windows.Forms.AnchorStyles.Right)));
             this.pnlTop.Controls.Add(this.chkAutoReset);
             this.pnlTop.Controls.Add(this.lblNote);
 
@@ -42,8 +44,11 @@ namespace LiveSplit.Teslagrad2
 
             // pnlRows
             this.pnlRows.Location = new System.Drawing.Point(0, 30);
-            this.pnlRows.Size = new System.Drawing.Size(415, 280);
+            this.pnlRows.Size = new System.Drawing.Size(560, 280);
             this.pnlRows.AutoScroll = true;
+            this.pnlRows.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+                | System.Windows.Forms.AnchorStyles.Left) 
+                | System.Windows.Forms.AnchorStyles.Right)));
             this.pnlRows.Name = "pnlRows";
 
             // Teslagrad2Settings
@@ -52,7 +57,7 @@ namespace LiveSplit.Teslagrad2
             this.Controls.Add(this.pnlTop);
             this.Controls.Add(this.pnlRows);
             this.Name = "Teslagrad2Settings";
-            this.Size = new System.Drawing.Size(415, 310);
+            this.Size = new System.Drawing.Size(560, 310);
             this.pnlTop.ResumeLayout(false);
             this.pnlTop.PerformLayout();
             this.ResumeLayout(false);

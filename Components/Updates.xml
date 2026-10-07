@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <updates>
+  <update version="1.2.0.0">
+    <files>
+      <file path="LiveSplit.Teslagrad2.dll" localPath="Components/LiveSplit.Teslagrad2.dll" status="changed" />
+    </files>
+    <changelog>
+      <change>Add split for the map.</change>
+      <change>Fix auto-update from GitHub releases.</change>
+    </changelog>
+  </update>
   <update version="1.1.0.0">
     <files>
       <file path="LiveSplit.Teslagrad2.dll" localPath="Components/LiveSplit.Teslagrad2.dll" status="changed" />

@@ -44,11 +44,17 @@ namespace LiveSplit.Teslagrad2
 
         // Other
         public MemoryWatcher<int> ScrollCount { get; private set; }
+        public MemoryWatcher<int> TriggerCount { get; private set; }
         public MemoryWatcher<bool> InElenorFight { get; private set; }
         public MemoryWatcher<int> SaveSlotCount { get; private set; }
 
         // Scroll tracking
         private MemoryWatcher<int> _lastScrollWatcher;
+
+        // Trigger tracking
+        public string LastTrigger { get; private set; } = "";
+        public string OldLastTrigger { get; private set; } = "";
+        private readonly System.Collections.Generic.List<string> _newTriggers = new System.Collections.Generic.List<string>();
 
         // Elenor fight - magnet health tracking
         private readonly SigScanTarget _magnetScanTarget;
@@ -152,6 +158,7 @@ namespace LiveSplit.Teslagrad2
             TrollBeaten = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x56)) { Name = "troll" };
 
             ScrollCount = new MemoryWatcher<int>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x80, 0x18)) { Name = "scroll_count" };
+            TriggerCount = new MemoryWatcher<int>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x68, 0x18)) { Name = "trigger_count" };
             InElenorFight = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, scene, 0xB8, 0x69)) { Name = "in_elenor_fight" };
             SaveSlotCount = new MemoryWatcher<int>(new DeepPointer(MODULE_NAME, file, 0xB8, 0x0, 0x10, 0x18)) { Name = "save_slot_count" };
 
@@ -164,7 +171,7 @@ namespace LiveSplit.Teslagrad2
                 PowerSlideUnlocked, AxeUnlocked, BlinkWireAxeUnlocked, RedCloakUnlocked,
                 OmniBlinkUnlocked, DoubleJumpUnlocked, SecretsMapUnlocked, MapUnlocked,
                 HulderBeaten, MooseBeaten, FafnirBeaten, HalvtannBeaten, GalvanBeaten, TrollBeaten,
-                ScrollCount, InElenorFight, SaveSlotCount
+                ScrollCount, TriggerCount, InElenorFight, SaveSlotCount
             };
         }
 
@@ -178,6 +185,9 @@ namespace LiveSplit.Teslagrad2
             _timeSpentPointer.DerefString(Game, 40, out string timeSpent);
             CurrentTimeSpent = timeSpent ?? "";
 
+            OldLastTrigger = LastTrigger;
+            _newTriggers.Clear();
+
             try
             {
                 Watchers.UpdateAll(Game);
@@ -189,6 +199,7 @@ namespace LiveSplit.Teslagrad2
             }
 
             UpdateScrollWatcher();
+            UpdateTriggerWatcher();
             UpdateElenorFight();
         }
 
@@ -212,6 +223,50 @@ namespace LiveSplit.Teslagrad2
                 return false;
 
             return _lastScrollWatcher.Current == scrollId && _lastScrollWatcher.Old != scrollId;
+        }
+
+        private void UpdateTriggerWatcher()
+        {
+            if (TriggerCount.Current > TriggerCount.Old)
+            {
+                int oldCount = TriggerCount.Old;
+                int newCount = TriggerCount.Current;
+
+                Log.Info($"Trigger count increased from {oldCount} to {newCount}");
+
+                // There may be several triggers set at once (or in the update interval)?
+                for (int idx = oldCount; idx < newCount; idx++)
+                {
+                    var p = new DeepPointer(
+                        MODULE_NAME, _offsets.BaseSaveDataSlot, 0xB8, 0x10, 0x68,
+                        0x10, 0x20 + idx * 0x8);
+                    
+                    try
+                    {
+                        p.DerefString(Game, 255, out string trig);
+                        trig = trig ?? "";
+                        _newTriggers.Add(trig);
+                        LastTrigger = trig;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error($"[Trigger] Failed to read trigger at index {idx}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        public bool CheckTriggerSet(string triggerName)
+        {
+            if (TriggerCount.Current == 0 || string.IsNullOrEmpty(triggerName))
+                return false;
+
+            // Return true if the triggerName was among the newly collected triggers this update.
+            if (_newTriggers.Contains(triggerName))
+                return true;
+
+            // Fallback: check the last trigger transition as before
+            return LastTrigger == triggerName && OldLastTrigger != triggerName;
         }
 
         private void UpdateElenorFight()

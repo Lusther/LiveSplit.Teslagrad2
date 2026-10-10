@@ -152,6 +152,9 @@ namespace LiveSplit.Teslagrad2
                     return _memory.CurrentScene == entry.SceneName
                         && _memory.OldScene != entry.SceneName;
 
+                case SplitType.TriggerSet:
+                    return _memory.CheckTriggerSet(entry.TriggerName);
+
                 default: return false;
             }
         }

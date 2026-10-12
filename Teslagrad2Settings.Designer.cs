@@ -13,18 +13,23 @@ namespace LiveSplit.Teslagrad2
 
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
+            this.myToolTip = new System.Windows.Forms.ToolTip(this.components);
+
             this.pnlTop = new System.Windows.Forms.Panel();
             this.chkAutoReset = new System.Windows.Forms.CheckBox();
             this.lblNote = new System.Windows.Forms.Label();
+            this.btnAutoAssignSplits = new System.Windows.Forms.Button();
             this.pnlRows = new System.Windows.Forms.Panel();
             this.pnlTop.SuspendLayout();
             this.SuspendLayout();
 
             // pnlTop
             this.pnlTop.Location = new System.Drawing.Point(0, 0);
-            this.pnlTop.Size = new System.Drawing.Size(415, 30);
+            this.pnlTop.Size = new System.Drawing.Size(415, 60);
             this.pnlTop.Controls.Add(this.chkAutoReset);
             this.pnlTop.Controls.Add(this.lblNote);
+            this.pnlTop.Controls.Add(this.btnAutoAssignSplits);
 
             // chkAutoReset
             this.chkAutoReset.AutoSize = true;
@@ -40,8 +45,15 @@ namespace LiveSplit.Teslagrad2
             this.lblNote.ForeColor = System.Drawing.Color.Gray;
             this.lblNote.Text = "Variable: Teslagrad2_Version";
 
+            // btnAutoAssignSplits
+            this.btnAutoAssignSplits.AutoSize = true;
+            this.btnAutoAssignSplits.Location = new System.Drawing.Point(0, 30);
+            this.btnAutoAssignSplits.Name = "btnAutoAssignSplits";
+            this.btnAutoAssignSplits.Text = "Auto-Assign Splits";
+            this.myToolTip.SetToolTip(this.btnAutoAssignSplits, "Try to set the split conditions based on the split names.");
+
             // pnlRows
-            this.pnlRows.Location = new System.Drawing.Point(0, 30);
+            this.pnlRows.Location = new System.Drawing.Point(0, 60);
             this.pnlRows.Size = new System.Drawing.Size(415, 280);
             this.pnlRows.AutoScroll = true;
             this.pnlRows.Name = "pnlRows";
@@ -61,6 +73,7 @@ namespace LiveSplit.Teslagrad2
         private System.Windows.Forms.Panel pnlTop;
         private System.Windows.Forms.CheckBox chkAutoReset;
         private System.Windows.Forms.Label lblNote;
+        private System.Windows.Forms.Button btnAutoAssignSplits;
         private System.Windows.Forms.Panel pnlRows;
     }
 }

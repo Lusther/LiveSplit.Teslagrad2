@@ -10,6 +10,8 @@ namespace LiveSplit.Teslagrad2
 {
     public partial class Teslagrad2Settings : UserControl
     {
+        private ToolTip myToolTip;
+        
         public List<SplitEntry> Splits { get; set; }
         public bool AutoReset { get; set; }
 
@@ -35,12 +37,29 @@ namespace LiveSplit.Teslagrad2
         private void WireEvents()
         {
             chkAutoReset.CheckedChanged += (s, e) => AutoReset = chkAutoReset.Checked;
+            btnAutoAssignSplits.Click += OnAutoAssignSplitsClick;
             this.Load += (s, e) => FitToParent();
             this.ParentChanged += (s, e) => FitToParent();
             this.SizeChanged += (s, e) => LayoutPanels();
         }
 
         private Control _subscribedParent;
+
+        private void OnAutoAssignSplitsClick(object sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                this,
+                "Auto-assign split conditions? This may replace your current assignments.",
+                "Auto-Assign Splits",
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Question);
+
+            if (result != DialogResult.OK)
+                return;
+
+            // Run the assignment logic here.
+            // AutoAssignSplits();
+        }
 
         private void FitToParent()
         {

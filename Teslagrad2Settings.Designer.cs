@@ -37,6 +37,7 @@ namespace LiveSplit.Teslagrad2
             this.chkAutoReset.Location = new System.Drawing.Point(10, 6);
             this.chkAutoReset.Name = "chkAutoReset";
             this.chkAutoReset.Text = "Auto Reset";
+            this.myToolTip.SetToolTip(chkAutoReset, "Automatically reset the timer when a save file is deleted.");
 
             // lblNote
             this.lblNote.AutoSize = true;

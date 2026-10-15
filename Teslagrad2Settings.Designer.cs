@@ -50,7 +50,9 @@ namespace LiveSplit.Teslagrad2
             this.btnAutoAssignSplits.Location = new System.Drawing.Point(0, 30);
             this.btnAutoAssignSplits.Name = "btnAutoAssignSplits";
             this.btnAutoAssignSplits.Text = "Auto-Assign Splits";
-            this.myToolTip.SetToolTip(this.btnAutoAssignSplits, "Try to set the split conditions based on the split names.");
+            this.myToolTip.SetToolTip(this.btnAutoAssignSplits, 
+                "Try to set the split conditions based on the split names.\n"
+              + "Defaults back to 'Manual Split' if no match is found.\n");
 
             // pnlRows
             this.pnlRows.Location = new System.Drawing.Point(0, 60);

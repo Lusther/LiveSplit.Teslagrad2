@@ -58,7 +58,7 @@ namespace LiveSplit.Teslagrad2
                 return;
 
             // Run the assignment logic here.
-            // AutoAssignSplits();
+            AutoAssignSplits();
         }
 
         private void FitToParent()
@@ -160,6 +160,100 @@ namespace LiveSplit.Teslagrad2
             }
 
             Splits = newSplits;
+            RebuildRows();
+        }
+
+        private void AutoAssignSplits()
+        {
+            var run = _state?.Run;
+            if (run == null || run.Count == 0) return;
+
+            // Clear existing assignments (except StartTimer)
+            for (int i = 1; i < Splits.Count; i++)
+            {
+                Splits[i].Type = SplitType.ManualSplit;
+                Splits[i].ScrollId = 0;
+                Splits[i].SceneName = "";
+            }
+
+            // Try to fill in split parameters based on segment names
+            // case-insensitive match, trim removes leading/trailing whitespace
+            for (int i = 1; i < Splits.Count; i++)
+            {
+                string segmentName = Splits[i].SegmentName ?? $"Segment {i}";
+                segmentName = segmentName.Trim();
+
+                // Skip if the segment name is just the default placeholder
+                if (segmentName.Equals($"Segment {i}", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // -----
+                // test Skills and Bosses by name directly
+                foreach (var type in Enum.GetValues(typeof(SplitType)).Cast<SplitType>())
+                {
+                    if ((type.GetCategory().Equals("Skills") || type.GetCategory().Equals("Bosses"))
+                        && segmentName.Equals(type.GetDisplayName(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        Splits[i].Type = type;
+                        break;
+                    }
+                }
+                // Managed to identify split type?
+                if (Splits[i].Type != SplitType.ManualSplit)
+                    continue;
+
+                // -----
+                // Following categories have additional parameters
+                char[] delimiters = new char[] { ' ', ':' };
+                string[] subs = segmentName.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                
+                // Make sure we have at least two parts to work with (e.g., "Scroll 1" or "Scene Level1")
+                if (subs.Length < 2)
+                    continue;
+
+                // -----
+                // Scrolls
+                if (subs[0].Equals("Scroll", StringComparison.OrdinalIgnoreCase))
+                {
+                    Splits[i].Type = SplitType.Scrolls;
+
+                    // Try to parse the second part as an integer for the Scroll ID
+                    if (int.TryParse(subs[1], out int scrollId) && scrollId > 0 && scrollId <= 100)
+                    {
+                        Splits[i].ScrollId = scrollId;
+                    }
+                }
+                // Managed to identify split type?
+                if (Splits[i].Type != SplitType.ManualSplit)
+                    continue;
+                
+                // -----
+                // Scene Entered
+                if (subs[0].Equals("Scene", StringComparison.OrdinalIgnoreCase)
+                    || subs[0].Equals("Enter", StringComparison.OrdinalIgnoreCase)
+                    || subs[0].Equals("SceneEntered", StringComparison.OrdinalIgnoreCase))
+                {
+                    Splits[i].Type = SplitType.SceneEntered;
+
+                    // Now use the rest as the scene name (scene names can contain spaces)
+                    int toSkip = 1;
+
+                    // Special case of "Scene Entered"
+                    if (string.Join(" ", subs.Take(2)).Equals("Scene Entered", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (subs.Length == 2) // Does not actually have a scene name
+                            continue;
+                        else
+                            toSkip = 2;
+                    }
+
+                    Splits[i].SceneName = string.Join(" ", subs.Skip(toSkip));
+                }
+                // Managed to identify split type?
+                if (Splits[i].Type != SplitType.ManualSplit)
+                    continue;
+            }
+
             RebuildRows();
         }
 

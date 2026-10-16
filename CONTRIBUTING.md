@@ -40,7 +40,7 @@ Use the format `type: description` with no body. The description must start with
 
 ## Supporting a new game build
 
-Game builds are identified by their Steam build id and listed in `Teslagrad2Constants.Builds`. Older builds are kept so runs on previous versions keep working.
+Game builds are identified by their Steam build id and listed in `Teslagrad2Constants.Builds`. Older builds are kept so runs on previous versions keep working. For the background (Steam depots and manifests, IL2CPP, pointer paths, PE timestamps), see [How game builds and offsets work](docs/how-game-builds-and-offsets-work.md).
 
 1. Install the build through Steam, then dump it with [Il2CppDumper](https://github.com/Perfare/Il2CppDumper):
    ```

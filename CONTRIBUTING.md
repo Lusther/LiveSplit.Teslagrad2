@@ -38,9 +38,23 @@ Use the format `type: description` with no body. The description must start with
 3. Launch Teslagrad 2 and verify your changes work correctly
 4. Test both new game and existing save scenarios
 
+## Supporting a new game build
+
+Game builds are identified by their Steam build id and listed in `Teslagrad2Constants.Builds`. Older builds are kept so runs on previous versions keep working.
+
+1. Install the build through Steam, then dump it with [Il2CppDumper](https://github.com/Perfare/Il2CppDumper):
+   ```
+   Il2CppDumper.exe "<game>\GameAssembly.dll" "<game>\Teslagrad 2_Data\il2cpp_data\Metadata\global-metadata.dat" .\dump
+   ```
+2. Preview the entry (also checks the field offsets used in `Teslagrad2Memory.cs` against `dump.cs`):
+   ```
+   .\tools\Update-Offsets.ps1 -DumpDir .\dump -GameDir "<game>"
+   ```
+3. Run it again with `-Apply` to add the build to `Teslagrad2Constants.cs`, then test in game.
+
 ## Reporting issues
 
 If you find broken splits or pointer paths after a game update, please open an issue with:
-- The game version
+- The game version (Steam build id, shown in the `Teslagrad2_Build` LiveSplit variable)
 - Which splits are affected
 - Any error messages from LiveSplit

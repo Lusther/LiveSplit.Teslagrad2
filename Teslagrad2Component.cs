@@ -60,7 +60,7 @@ namespace LiveSplit.Teslagrad2
 
             if (!_hooked)
             {
-                Log.Info($"Hooked to process: {_memory.Game.ProcessName} (PID {_memory.Game.Id}), version: {Teslagrad2Constants.GetVersionName(_memory.Version)}");
+                Log.Info($"Hooked to process: {_memory.Game.ProcessName} (PID {_memory.Game.Id}), {_memory.Build}");
                 _hooked = true;
                 UpdateVersionDisplay(state);
             }
@@ -157,6 +157,7 @@ namespace LiveSplit.Teslagrad2
         }
 
         private const string VERSION_VARIABLE = "Teslagrad2_Version";
+        private const string BUILD_VARIABLE = "Teslagrad2_Build";
 
         // Reflection is required because the CustomVariable API was added in a newer
         // LiveSplit.Core than the one available at compile time.
@@ -166,9 +167,8 @@ namespace LiveSplit.Teslagrad2
 
         private void UpdateVersionDisplay(LiveSplitState state)
         {
-            string versionText = _hooked
-                ? Teslagrad2Constants.GetVersionName(_memory.Version)
-                : "";
+            string versionText = _hooked ? $"{_memory.Build.Branch} (build {_memory.Build.BuildId})" : "";
+            string buildText = _hooked ? _memory.Build.BuildId.ToString() : "";
 
             try
             {
@@ -183,6 +183,8 @@ namespace LiveSplit.Teslagrad2
                 var metadata = state.Run.Metadata;
                 _getOrAddCustomVariable?.Invoke(metadata, new object[] { VERSION_VARIABLE });
                 _setCustomVariable?.Invoke(metadata, new object[] { VERSION_VARIABLE, versionText });
+                _getOrAddCustomVariable?.Invoke(metadata, new object[] { BUILD_VARIABLE });
+                _setCustomVariable?.Invoke(metadata, new object[] { BUILD_VARIABLE, buildText });
             }
             catch (Exception ex)
             {

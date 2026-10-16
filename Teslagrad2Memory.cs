@@ -13,8 +13,7 @@ namespace LiveSplit.Teslagrad2
         private const int HOOK_RETRY_INTERVAL_MS = 2000;
 
         public Process Game { get; private set; }
-        public GameVersion Version { get; private set; } = GameVersion.Unknown;
-        private VersionOffsets _offsets;
+        public GameBuild Build { get; private set; }
         private DateTime _lastHookAttempt = DateTime.MinValue;
 
         // Pointer paths from the ASL state block
@@ -106,17 +105,17 @@ namespace LiveSplit.Teslagrad2
                 return false;
             }
 
-            Log.Info($"GameAssembly.dll ModuleMemorySize: {module.ModuleMemorySize}");
-            Version = Teslagrad2Constants.DetectVersion(module.ModuleMemorySize);
-            if (Version == GameVersion.Unknown)
+            uint timestamp = ReadModuleTimestamp(module);
+            Log.Info($"GameAssembly.dll timestamp: 0x{timestamp:X8}, ModuleMemorySize: {module.ModuleMemorySize}");
+            Build = Teslagrad2Constants.DetectBuild(timestamp);
+            if (Build == null)
             {
-                Log.Error($"Unknown GameAssembly.dll module size: {module.ModuleMemorySize} - cannot detect game version");
+                Log.Error($"Unknown GameAssembly.dll build (timestamp 0x{timestamp:X8}, module size {module.ModuleMemorySize}) - add it with tools/Update-Offsets.ps1");
                 Game.Dispose();
                 Game = null;
                 return false;
             }
 
-            _offsets = Teslagrad2Constants.Versions[Version];
             InitializeWatchers();
 
             _lastScrollWatcher = null;
@@ -125,11 +124,18 @@ namespace LiveSplit.Teslagrad2
             return true;
         }
 
+        // TimeDateStamp of the PE header, changes with every compilation of the game
+        private uint ReadModuleTimestamp(ProcessModuleWow64Safe module)
+        {
+            int peHeaderOffset = Game.ReadValue<int>(module.BaseAddress + 0x3C);
+            return Game.ReadValue<uint>(module.BaseAddress + peHeaderOffset + 0x8);
+        }
+
         private void InitializeWatchers()
         {
-            int save = _offsets.BaseSaveDataSlot;
-            int scene = _offsets.BaseSceneHandler;
-            int file = _offsets.BaseSaveDataFile;
+            int save = Build.BaseSaveDataSlot;
+            int scene = Build.BaseSceneHandler;
+            int file = Build.BaseSaveDataFile;
 
             BlinkUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x44)) { Name = "blink" };
             BlueCloakUnlocked = new MemoryWatcher<bool>(new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x45)) { Name = "blue_cloak" };
@@ -197,7 +203,7 @@ namespace LiveSplit.Teslagrad2
             if (ScrollCount.Current != ScrollCount.Old)
             {
                 var lastScrollPointer = new DeepPointer(
-                    MODULE_NAME, _offsets.BaseSaveDataSlot, 0xB8, 0x10, 0x80, 0x10,
+                    MODULE_NAME, Build.BaseSaveDataSlot, 0xB8, 0x10, 0x80, 0x10,
                     0x20 + (ScrollCount.Current - 1) * 0x4);
                 _lastScrollWatcher = new MemoryWatcher<int>(lastScrollPointer);
             }
@@ -281,8 +287,7 @@ namespace LiveSplit.Teslagrad2
         {
             Game?.Dispose();
             Game = null;
-            Version = GameVersion.Unknown;
-            _offsets = null;
+            Build = null;
             _lastScrollWatcher = null;
             _magnetWatchers = new MemoryWatcherList();
             _magnetControllerAddress = IntPtr.Zero;

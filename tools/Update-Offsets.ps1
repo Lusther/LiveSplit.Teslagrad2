@@ -39,6 +39,7 @@ $BaseClasses = [ordered]@{
     saveDataSlot = 'Game'
     sceneHandler = 'PlayerSceneHandler'
     saveDataFile = 'SaveDataFile'
+    player = 'Player'
 }
 
 # Field offsets hardcoded in Teslagrad2Memory.cs, as class -> field -> offset
@@ -56,6 +57,7 @@ $ExpectedFields = [ordered]@{
     'PlayerSceneHandler' = [ordered]@{ _currentScene = 0x0; InElenorBossFight = 0x69 }
     'HyperSceneNode'     = [ordered]@{ scene = 0x28 }
     'SaveDataFile'       = [ordered]@{ instance = 0x0; saveDataSlots = 0x10 }
+    'Player'             = [ordered]@{ instance = 0x0 }
 }
 
 function Get-TypeInfoAddress([string]$json, [string]$className) {

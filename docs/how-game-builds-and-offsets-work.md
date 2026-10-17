@@ -78,15 +78,37 @@ The numbers don't all change for the same reasons:
 | `0xB8` | Layout of IL2CPP's own class structure | Only on a Unity version upgrade |
 | `0x10`, `0x44` | Position of fields in the game's C# classes | Only if the developers add or remove fields in those classes |
 
-That is why each build in `Teslagrad2Constants.Builds` stores three base addresses, one per class the component starts from, while the rest of the pointer paths stays in `Teslagrad2Memory.cs`:
+That is why each build in `Teslagrad2Constants.Builds` stores four base addresses, one per class the component starts from, while the rest of the pointer paths stays in `Teslagrad2Memory.cs`:
 
 | Constructor argument | IL2CPP class | Used for |
 |---|---|---|
 | `saveDataSlot` | `Game` (static `activeSlot`) | Skills, bosses, scrolls, time spent |
 | `sceneHandler` | `PlayerSceneHandler` | Current scene, Elenor fight |
 | `saveDataFile` | `SaveDataFile` | Number of save slots |
+| `player` | `Player` (static `instance`) | Lumina's position |
 
-Example: from build 20406723 to 23225880, the three base addresses all moved by exactly +8 bytes. These `_TypeInfo` slots are stored next to each other, so most likely one 8-byte pointer was added before them, shifting everything that follows.
+### The player position: leaving C# for Unity's native memory
+
+The position is not a C# field: `Player.Position` returns `instance.transform.position`, and `transform.position` is an *internal call* implemented in C++ inside `UnityPlayer.dll`. The path therefore crosses into Unity's native objects, whose layout was read from `UnityPlayer.dll` 2021.3.45f2 with Ghidra:
+
+```
+GameAssembly.dll + Player_TypeInfo
+  + 0xB8 → static fields, + 0x0 → Player.instance          (C# object)
+  + 0x10 → m_CachedPtr: the native C++ object behind any UnityEngine.Object
+  + 0x30 → its GameObject
+  + 0x30 → the GameObject's component array, + 0x8 → component 0, always the Transform
+Transform
+  + 0x38 → TransformHierarchy,  + 0x40 → index of this transform in it
+TransformHierarchy
+  + 0x18 → array of { position, rotation, scale }, 0x30 bytes per transform
+  + 0x20 → array of parent indices, -1 for a root
+```
+
+The array holds *local* positions: like `Transform::GetPosition`, `Teslagrad2Memory.ReadPlayerPosition` applies the scale, rotation and position of every ancestor to get the world position (Lumina sits under a neutral parent, but the game can move her under another one).
+
+These native offsets do not depend on the game build, only on the Unity version: they need checking again only if `UnityPlayer.dll` changes version (file properties, "Product version").
+
+Example: from build 20406723 to 23225880, the four base addresses all moved by exactly +8 bytes. These `_TypeInfo` slots are stored next to each other, so most likely one 8-byte pointer was added before them, shifting everything that follows.
 
 ## 5. What Il2CppDumper does
 
@@ -136,19 +158,19 @@ int peHeaderOffset = Game.ReadValue<int>(module.BaseAddress + 0x3C);
 return Game.ReadValue<uint>(module.BaseAddress + peHeaderOffset + 0x8);
 ```
 
-It then looks the timestamp up in `Teslagrad2Constants.Builds`. A match gives the build id, its branch and its three base addresses; no match means an unknown build, and the component refuses to hook (and logs it) instead of reading wrong values. The branch and build id are shown in the `Teslagrad2_Version` LiveSplit variable (e.g. `public (build 23225880)`), and the build id alone in `Teslagrad2_Build`.
+It then looks the timestamp up in `Teslagrad2Constants.Builds`. A match gives the build id, its branch and its four base addresses; no match means an unknown build, and the component refuses to hook (and logs it) instead of reading wrong values. The branch and build id are shown in the `Teslagrad2_Version` LiveSplit variable (e.g. `public (build 23225880)`), and the build id alone in `Teslagrad2_Build`.
 
 ## 7. What `tools/Update-Offsets.ps1` does
 
 It turns the files of a build into one line of `Teslagrad2Constants.cs`:
 
-1. **Reads `script.json`** and finds `Game_TypeInfo`, `PlayerSceneHandler_TypeInfo` and `SaveDataFile_TypeInfo`: the three base addresses.
+1. **Reads `script.json`** and finds `Game_TypeInfo`, `PlayerSceneHandler_TypeInfo`, `SaveDataFile_TypeInfo` and `Player_TypeInfo`: the four base addresses.
 2. **Reads the PE header of `GameAssembly.dll`** on disk: timestamp and size.
 3. **Reads Steam's app manifest** (`steamapps\appmanifest_1698220.acf`, where Steam records what is installed): build id and branch. For files downloaded with DepotDownloader, pass `-Build` and `-Branch` instead.
 4. **Checks `dump.cs`** for every field offset `Teslagrad2Memory.cs` relies on (`activeSlot = 0x10`, `blinkUnlocked = 0x44`, `scrollsPickedUp = 0x80`, ...). If one moved or disappeared it reports it and exits with code 1: `Teslagrad2Memory.cs` then needs a manual fix too.
 5. **Writes the entry**, replacing the line of that build id if it exists, or adding it at the top:
    ```csharp
-   new GameBuild(23225880, "public", 0x6A0376AF, 48156672, 0x2775B40, 0x273C238, 0x274A470),
+   new GameBuild(23225880, "public", 0x6A0376AF, 48156672, 0x2775B40, 0x273C238, 0x274A470, 0x273B718),
    ```
    Without `-Apply` it only prints what it would change.
 

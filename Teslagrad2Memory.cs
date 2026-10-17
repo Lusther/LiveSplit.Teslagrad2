@@ -12,6 +12,15 @@ namespace LiveSplit.Teslagrad2
         private const string MODULE_NAME = "GameAssembly.dll";
         private const int HOOK_RETRY_INTERVAL_MS = 2000;
 
+        // Native Transform layout, from UnityPlayer.dll 2021.3.45f2 (changes only with the Unity version).
+        // Transform::GetPosition reads the local position from the hierarchy, then applies each ancestor.
+        private const int TRANSFORM_HIERARCHY = 0x38;
+        private const int TRANSFORM_INDEX = 0x40;
+        private const int HIERARCHY_TRS = 0x18;      // { position, rotation, scale } per transform
+        private const int HIERARCHY_PARENTS = 0x20;  // parent index per transform, -1 for a root
+        private const int TRS_SIZE = 0x30;
+        private const int MAX_TRANSFORM_DEPTH = 32;
+
         public Process Game { get; private set; }
         public GameBuild Build { get; private set; }
         private DateTime _lastHookAttempt = DateTime.MinValue;
@@ -64,6 +73,11 @@ namespace LiveSplit.Teslagrad2
         private DeepPointer _timeSpentPointer;
         public string CurrentTimeSpent { get; private set; } = "";
         public string OldTimeSpent { get; private set; } = "";
+
+        // Player world position (read manually from the native Transform)
+        private DeepPointer _playerTransformPointer;
+        public PlayerPosition CurrentPosition { get; private set; }
+        public PlayerPosition OldPosition { get; private set; }
 
         public Teslagrad2Memory()
         {
@@ -163,6 +177,10 @@ namespace LiveSplit.Teslagrad2
 
             _currentScenePointer = new DeepPointer(MODULE_NAME, scene, 0xB8, 0x00, 0x28, 0x10, 0x14);
             _timeSpentPointer = new DeepPointer(MODULE_NAME, save, 0xB8, 0x10, 0x28, 0x14);
+            // Player.instance -> m_CachedPtr -> native GameObject -> components[0] (always the Transform)
+            _playerTransformPointer = new DeepPointer(MODULE_NAME, Build.BasePlayer, 0xB8, 0x0, 0x10, 0x30, 0x30, 0x8);
+            CurrentPosition = PlayerPosition.Invalid;
+            OldPosition = PlayerPosition.Invalid;
 
             Watchers = new MemoryWatcherList
             {
@@ -183,6 +201,9 @@ namespace LiveSplit.Teslagrad2
             OldTimeSpent = CurrentTimeSpent;
             _timeSpentPointer.DerefString(Game, 40, out string timeSpent);
             CurrentTimeSpent = timeSpent ?? "";
+
+            OldPosition = CurrentPosition;
+            CurrentPosition = ReadPlayerPosition();
 
             try
             {
@@ -210,6 +231,35 @@ namespace LiveSplit.Teslagrad2
 
             if (_lastScrollWatcher != null)
                 _lastScrollWatcher.Update(Game);
+        }
+
+        // Same computation as Transform::GetPosition: starting from the local position, apply each
+        // ancestor's scale, rotation and translation up to the root
+        private PlayerPosition ReadPlayerPosition()
+        {
+            if (!_playerTransformPointer.Deref(Game, out IntPtr transform)
+                || !Game.ReadPointer(transform + TRANSFORM_HIERARCHY, out IntPtr hierarchy)
+                || !Game.ReadValue(transform + TRANSFORM_INDEX, out int index)
+                || !Game.ReadPointer(hierarchy + HIERARCHY_TRS, out IntPtr trs)
+                || !Game.ReadPointer(hierarchy + HIERARCHY_PARENTS, out IntPtr parents)
+                || !Game.ReadValue(trs + index * TRS_SIZE, out Vec3 position)
+                || !Game.ReadValue(parents + index * 4, out int parent))
+                return PlayerPosition.Invalid;
+
+            for (int depth = 0; parent >= 0; depth++)
+            {
+                IntPtr ancestor = trs + parent * TRS_SIZE;
+                if (depth >= MAX_TRANSFORM_DEPTH
+                    || !Game.ReadValue(ancestor, out Vec3 translation)
+                    || !Game.ReadValue(ancestor + 0x10, out Quat rotation)
+                    || !Game.ReadValue(ancestor + 0x20, out Vec3 scale)
+                    || !Game.ReadValue(parents + parent * 4, out parent))
+                    return PlayerPosition.Invalid;
+
+                position = rotation.Rotate(position.Scale(scale)).Add(translation);
+            }
+
+            return new PlayerPosition(position.X, position.Y);
         }
 
         public bool CheckScrollCollected(int scrollId)

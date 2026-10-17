@@ -152,6 +152,12 @@ namespace LiveSplit.Teslagrad2
                     return _memory.CurrentScene == entry.SceneName
                         && _memory.OldScene != entry.SceneName;
 
+                // Only on the way in, and not when the player appears inside after a loading
+                case SplitType.PositionReached:
+                    return _memory.OldPosition.IsValid
+                        && _memory.CurrentPosition.IsInSquare(entry.PosX, entry.PosY, entry.Radius)
+                        && !_memory.OldPosition.IsInSquare(entry.PosX, entry.PosY, entry.Radius);
+
                 default: return false;
             }
         }

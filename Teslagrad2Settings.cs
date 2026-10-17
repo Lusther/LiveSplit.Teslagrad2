@@ -14,6 +14,11 @@ namespace LiveSplit.Teslagrad2
         public List<SplitEntry> Splits { get; set; }
         public bool AutoReset { get; set; }
 
+        // Information lines drawn by the component itself in the layout
+        public bool ShowPosition { get; set; }
+        public bool ShowScene { get; set; }
+        public bool ShowVersion { get; set; }
+
         private const int ROW_HEIGHT = 28;
         private const string POS_X_FIELD = "X";
         private const string POS_Y_FIELD = "Y";
@@ -39,6 +44,9 @@ namespace LiveSplit.Teslagrad2
         private void WireEvents()
         {
             chkAutoReset.CheckedChanged += (s, e) => AutoReset = chkAutoReset.Checked;
+            chkShowPosition.CheckedChanged += (s, e) => ShowPosition = chkShowPosition.Checked;
+            chkShowScene.CheckedChanged += (s, e) => ShowScene = chkShowScene.Checked;
+            chkShowVersion.CheckedChanged += (s, e) => ShowVersion = chkShowVersion.Checked;
             this.Load += (s, e) => FitToParent();
             this.ParentChanged += (s, e) => FitToParent();
             this.SizeChanged += (s, e) => LayoutPanels();
@@ -533,6 +541,10 @@ namespace LiveSplit.Teslagrad2
             autoReset.InnerText = AutoReset.ToString();
             parent.AppendChild(autoReset);
 
+            AppendBool(document, parent, "ShowPosition", ShowPosition);
+            AppendBool(document, parent, "ShowScene", ShowScene);
+            AppendBool(document, parent, "ShowVersion", ShowVersion);
+
             var splitsNode = document.CreateElement("Splits");
             foreach (var entry in Splits)
             {
@@ -561,6 +573,9 @@ namespace LiveSplit.Teslagrad2
         {
             var autoResetNode = node["AutoReset"];
             AutoReset = autoResetNode != null && bool.TryParse(autoResetNode.InnerText, out bool ar) ? ar : true;
+            ShowPosition = ReadBool(node, "ShowPosition");
+            ShowScene = ReadBool(node, "ShowScene");
+            ShowVersion = ReadBool(node, "ShowVersion");
 
             var splitsNode = node["Splits"];
             if (splitsNode != null && splitsNode.ChildNodes.Count >= 1)
@@ -601,8 +616,24 @@ namespace LiveSplit.Teslagrad2
             }
 
             chkAutoReset.Checked = AutoReset;
+            chkShowPosition.Checked = ShowPosition;
+            chkShowScene.Checked = ShowScene;
+            chkShowVersion.Checked = ShowVersion;
             SyncWithRun();
             RebuildRows();
+        }
+
+        private static void AppendBool(XmlDocument document, XmlElement parent, string name, bool value)
+        {
+            var element = document.CreateElement(name);
+            element.InnerText = value.ToString();
+            parent.AppendChild(element);
+        }
+
+        // Missing in layouts saved before the option existed: off by default
+        private static bool ReadBool(XmlNode node, string name)
+        {
+            return bool.TryParse(node[name]?.InnerText, out bool value) && value;
         }
 
         #endregion

@@ -82,7 +82,10 @@ namespace LiveSplit.Teslagrad2
         Scrolls,
 
         // Scene
-        SceneEntered
+        SceneEntered,
+
+        // Trigger
+        TriggerSet
     }
 
     public static class SplitTypeExtensions
@@ -114,6 +117,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.Troll: return "Troll";
                 case SplitType.Scrolls: return "Scrolls";
                 case SplitType.SceneEntered: return "Scene Entered";
+                case SplitType.TriggerSet: return "Trigger Set";
                 default: return type.ToString();
             }
         }
@@ -149,6 +153,8 @@ namespace LiveSplit.Teslagrad2
                     return "General";
                 case SplitType.SceneEntered:
                     return "Scene";
+                case SplitType.TriggerSet:
+                    return "Trigger";
                 default:
                     return "";
             }

@@ -5,6 +5,7 @@ using LiveSplit.UI.Components;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
@@ -34,6 +35,10 @@ namespace LiveSplit.Teslagrad2
 
         private bool _hooked;
 
+        private readonly LayoutTextLine _positionLine = new LayoutTextLine("Position", POSITION_VARIABLE);
+        private readonly LayoutTextLine _sceneLine = new LayoutTextLine("Scene", SCENE_VARIABLE);
+        private readonly LayoutTextLine _versionLine = new LayoutTextLine("Game version", VERSION_VARIABLE);
+
         public Teslagrad2Component(LiveSplitState state)
         {
             _state = state;
@@ -46,7 +51,13 @@ namespace LiveSplit.Teslagrad2
         public void Update(IInvalidator invalidator, LiveSplitState state, float width, float height, LayoutMode mode)
         {
             _settings.SyncWithRun();
+            UpdateGame(state);
+            UpdateInformation(state);
+            UpdateLayoutLines(state);
+        }
 
+        private void UpdateGame(LiveSplitState state)
+        {
             if (!_memory.TryHook())
             {
                 if (_hooked)
@@ -152,12 +163,20 @@ namespace LiveSplit.Teslagrad2
                     return _memory.CurrentScene == entry.SceneName
                         && _memory.OldScene != entry.SceneName;
 
+                // Only on the way in, and not when the player appears inside after a loading
+                case SplitType.PositionReached:
+                    return _memory.OldPosition.IsValid
+                        && _memory.CurrentPosition.IsInSquare(entry.PosX, entry.PosY, entry.Radius)
+                        && !_memory.OldPosition.IsInSquare(entry.PosX, entry.PosY, entry.Radius);
+
                 default: return false;
             }
         }
 
         private const string VERSION_VARIABLE = "Teslagrad2_Version";
         private const string BUILD_VARIABLE = "Teslagrad2_Build";
+        private const string POSITION_VARIABLE = "Teslagrad2_Position";
+        private const string SCENE_VARIABLE = "Teslagrad2_Scene";
 
         // Reflection is required because the CustomVariable API was added in a newer
         // LiveSplit.Core than the one available at compile time.
@@ -165,11 +184,49 @@ namespace LiveSplit.Teslagrad2
         private static MethodInfo _setCustomVariable;
         private static bool _reflectionResolved;
 
+        // Last values sent, so the variables are only touched when the displayed text changes
+        private string _positionText;
+        private string _sceneText;
+
         private void UpdateVersionDisplay(LiveSplitState state)
         {
             string versionText = _hooked ? $"{_memory.Build.Branch} (build {_memory.Build.BuildId})" : "";
             string buildText = _hooked ? _memory.Build.BuildId.ToString() : "";
 
+            SetCustomVariable(state, VERSION_VARIABLE, versionText);
+            SetCustomVariable(state, BUILD_VARIABLE, buildText);
+        }
+
+        private void UpdateInformation(LiveSplitState state)
+        {
+            // Same "X, Y" format as the Position Reached fields accept
+            var position = _memory.CurrentPosition;
+            string positionText = _hooked && position.IsValid
+                ? string.Format(CultureInfo.InvariantCulture, "{0:F2}, {1:F2}", position.X, position.Y)
+                : "";
+            if (positionText != _positionText)
+            {
+                _positionText = positionText;
+                SetCustomVariable(state, POSITION_VARIABLE, positionText);
+            }
+
+            string sceneText = _hooked ? _memory.CurrentScene : "";
+            if (sceneText != _sceneText)
+            {
+                _sceneText = sceneText;
+                SetCustomVariable(state, SCENE_VARIABLE, sceneText);
+            }
+        }
+
+        private void UpdateLayoutLines(LiveSplitState state)
+        {
+            _positionLine.Update(state, _settings.ShowPosition);
+            _sceneLine.Update(state, _settings.ShowScene);
+            _versionLine.Update(state, _settings.ShowVersion);
+        }
+
+        private static void SetCustomVariable(LiveSplitState state, string name, string value)
+        {
             try
             {
                 if (!_reflectionResolved)
@@ -181,14 +238,12 @@ namespace LiveSplit.Teslagrad2
                 }
 
                 var metadata = state.Run.Metadata;
-                _getOrAddCustomVariable?.Invoke(metadata, new object[] { VERSION_VARIABLE });
-                _setCustomVariable?.Invoke(metadata, new object[] { VERSION_VARIABLE, versionText });
-                _getOrAddCustomVariable?.Invoke(metadata, new object[] { BUILD_VARIABLE });
-                _setCustomVariable?.Invoke(metadata, new object[] { BUILD_VARIABLE, buildText });
+                _getOrAddCustomVariable?.Invoke(metadata, new object[] { name });
+                _setCustomVariable?.Invoke(metadata, new object[] { name, value });
             }
             catch (Exception ex)
             {
-                Log.Error($"Failed to set custom variable: {ex.Message}");
+                Log.Error($"Failed to set custom variable {name}: {ex.Message}");
             }
         }
 
@@ -201,6 +256,10 @@ namespace LiveSplit.Teslagrad2
 
         public void Dispose()
         {
+            // Lines added to the layout leave with the autosplitter (deactivated or removed)
+            _positionLine.Remove(_state);
+            _sceneLine.Remove(_state);
+            _versionLine.Remove(_state);
             _memory.Dispose();
         }
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using System.Xml;
@@ -13,7 +14,15 @@ namespace LiveSplit.Teslagrad2
         public List<SplitEntry> Splits { get; set; }
         public bool AutoReset { get; set; }
 
+        // Information lines drawn by the component itself in the layout
+        public bool ShowPosition { get; set; }
+        public bool ShowScene { get; set; }
+        public bool ShowVersion { get; set; }
+
         private const int ROW_HEIGHT = 28;
+        private const string POS_X_FIELD = "X";
+        private const string POS_Y_FIELD = "Y";
+        private const string RADIUS_FIELD = "Radius";
         private readonly List<Panel> _rowPanels = new List<Panel>();
         private readonly LiveSplitState _state;
         private Font _headerFont;
@@ -35,6 +44,9 @@ namespace LiveSplit.Teslagrad2
         private void WireEvents()
         {
             chkAutoReset.CheckedChanged += (s, e) => AutoReset = chkAutoReset.Checked;
+            chkShowPosition.CheckedChanged += (s, e) => ShowPosition = chkShowPosition.Checked;
+            chkShowScene.CheckedChanged += (s, e) => ShowScene = chkShowScene.Checked;
+            chkShowVersion.CheckedChanged += (s, e) => ShowVersion = chkShowVersion.Checked;
             this.Load += (s, e) => FitToParent();
             this.ParentChanged += (s, e) => FitToParent();
             this.SizeChanged += (s, e) => LayoutPanels();
@@ -172,11 +184,14 @@ namespace LiveSplit.Teslagrad2
 
         private void UpdateRowPositions()
         {
+            int y = 0;
             for (int i = 0; i < _rowPanels.Count; i++)
             {
                 var row = _rowPanels[i];
                 row.Tag = i;
-                row.Location = new Point(0, i * ROW_HEIGHT);
+                row.Height = GetRowHeight(i);
+                row.Location = new Point(0, y);
+                y += row.Height;
                 foreach (Control ctrl in row.Controls)
                 {
                     if (ctrl.Tag is int)
@@ -187,9 +202,15 @@ namespace LiveSplit.Teslagrad2
 
         private Panel CreateRow(int index)
         {
-            var row = new Panel { Height = ROW_HEIGHT, Width = 450, Tag = index };
+            var row = new Panel { Height = GetRowHeight(index), Width = 450, Tag = index };
             PopulateRowControls(row, index);
             return row;
+        }
+
+        // Position splits put their X / Y / Radius fields on a second line
+        private int GetRowHeight(int index)
+        {
+            return Splits[index].Type == SplitType.PositionReached ? 2 * ROW_HEIGHT : ROW_HEIGHT;
         }
 
         private void RefreshRowControls(int index)
@@ -201,6 +222,7 @@ namespace LiveSplit.Teslagrad2
             row.Controls.Clear();
             PopulateRowControls(row, index);
             row.ResumeLayout();
+            UpdateRowPositions();
         }
 
         private void PopulateRowControls(Panel row, int index)
@@ -287,7 +309,40 @@ namespace LiveSplit.Teslagrad2
                     txt.Leave += OnRowSceneNameChanged;
                     row.Controls.Add(txt);
                 }
+                else if (entry.Type == SplitType.PositionReached)
+                {
+                    // Second line, aligned under the type combo
+                    int px = 125;
+                    int py = ROW_HEIGHT + 3;
+                    AddPositionField(row, index, POS_X_FIELD, entry.PosX, 65, ref px, py);
+                    AddPositionField(row, index, POS_Y_FIELD, entry.PosY, 65, ref px, py);
+                    AddPositionField(row, index, RADIUS_FIELD, entry.Radius, 45, ref px, py);
+                }
             }
+        }
+
+        private void AddPositionField(Panel row, int index, string field, float value, int width, ref int x, int y)
+        {
+            var lbl = new Label
+            {
+                Text = field + ":",
+                Location = new Point(x, y + 2),
+                AutoSize = true
+            };
+            row.Controls.Add(lbl);
+            x += TextRenderer.MeasureText(lbl.Text, lbl.Font).Width;
+
+            var txt = new TextBox
+            {
+                Text = FormatFloat(value),
+                Location = new Point(x, y),
+                Size = new Size(width, 21),
+                Tag = index,
+                Name = field
+            };
+            txt.Leave += OnRowPositionChanged;
+            row.Controls.Add(txt);
+            x += width + 6;
         }
 
         private void PopulateCombo(ComboBox combo)
@@ -354,11 +409,65 @@ namespace LiveSplit.Teslagrad2
                 Splits[index].ScrollId = 0;
             if (item.Type != SplitType.SceneEntered)
                 Splits[index].SceneName = "";
+            if (item.Type != SplitType.PositionReached)
+            {
+                Splits[index].PosX = 0;
+                Splits[index].PosY = 0;
+                Splits[index].Radius = SplitEntry.DEFAULT_RADIUS;
+            }
 
-            bool hadExtra = oldType == SplitType.Scrolls || oldType == SplitType.SceneEntered;
-            bool needsExtra = item.Type == SplitType.Scrolls || item.Type == SplitType.SceneEntered;
+            bool hadExtra = HasExtraControls(oldType);
+            bool needsExtra = HasExtraControls(item.Type);
             if (hadExtra || needsExtra)
                 RefreshRowControls(index);
+        }
+
+        private static bool HasExtraControls(SplitType type)
+        {
+            return type == SplitType.Scrolls || type == SplitType.SceneEntered || type == SplitType.PositionReached;
+        }
+
+        private void OnRowPositionChanged(object sender, EventArgs e)
+        {
+            var txt = (TextBox)sender;
+            int index = (int)txt.Tag;
+            if (index < 0 || index >= Splits.Count) return;
+            var entry = Splits[index];
+
+            // "X, Y" as copied by the position tool fills both coordinates at once
+            string[] parts = txt.Text.Split(new[] { ", " }, StringSplitOptions.None);
+            if (txt.Name != RADIUS_FIELD && parts.Length == 2
+                && TryParseFloat(parts[0], out float x) && TryParseFloat(parts[1], out float y))
+            {
+                entry.PosX = x;
+                entry.PosY = y;
+            }
+            else if (TryParseFloat(txt.Text, out float value))
+            {
+                if (txt.Name == POS_X_FIELD) entry.PosX = value;
+                else if (txt.Name == POS_Y_FIELD) entry.PosY = value;
+                else if (value > 0) entry.Radius = value;
+            }
+
+            // Show the stored values, which also reverts invalid input
+            foreach (Control ctrl in txt.Parent.Controls)
+            {
+                if (ctrl.Name == POS_X_FIELD) ctrl.Text = FormatFloat(entry.PosX);
+                else if (ctrl.Name == POS_Y_FIELD) ctrl.Text = FormatFloat(entry.PosY);
+                else if (ctrl.Name == RADIUS_FIELD) ctrl.Text = FormatFloat(entry.Radius);
+            }
+        }
+
+        // Accepts both "1.5" and "1,5" whatever the system culture
+        private static bool TryParseFloat(string text, out float value)
+        {
+            return float.TryParse(text.Trim().Replace(',', '.'), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out value);
+        }
+
+        private static string FormatFloat(float value)
+        {
+            return value.ToString("0.##", CultureInfo.InvariantCulture);
         }
 
         private void OnRowScrollIdChanged(object sender, EventArgs e)
@@ -432,6 +541,10 @@ namespace LiveSplit.Teslagrad2
             autoReset.InnerText = AutoReset.ToString();
             parent.AppendChild(autoReset);
 
+            AppendBool(document, parent, "ShowPosition", ShowPosition);
+            AppendBool(document, parent, "ShowScene", ShowScene);
+            AppendBool(document, parent, "ShowVersion", ShowVersion);
+
             var splitsNode = document.CreateElement("Splits");
             foreach (var entry in Splits)
             {
@@ -441,6 +554,12 @@ namespace LiveSplit.Teslagrad2
                     splitNode.SetAttribute("ScrollId", entry.ScrollId.ToString());
                 if (entry.Type == SplitType.SceneEntered)
                     splitNode.SetAttribute("SceneName", entry.SceneName ?? "");
+                if (entry.Type == SplitType.PositionReached)
+                {
+                    splitNode.SetAttribute("PosX", entry.PosX.ToString("R", CultureInfo.InvariantCulture));
+                    splitNode.SetAttribute("PosY", entry.PosY.ToString("R", CultureInfo.InvariantCulture));
+                    splitNode.SetAttribute("Radius", entry.Radius.ToString("R", CultureInfo.InvariantCulture));
+                }
                 if (entry.SegmentName != null)
                     splitNode.SetAttribute("SegmentName", entry.SegmentName);
                 splitsNode.AppendChild(splitNode);
@@ -454,6 +573,9 @@ namespace LiveSplit.Teslagrad2
         {
             var autoResetNode = node["AutoReset"];
             AutoReset = autoResetNode != null && bool.TryParse(autoResetNode.InnerText, out bool ar) ? ar : true;
+            ShowPosition = ReadBool(node, "ShowPosition");
+            ShowScene = ReadBool(node, "ShowScene");
+            ShowVersion = ReadBool(node, "ShowVersion");
 
             var splitsNode = node["Splits"];
             if (splitsNode != null && splitsNode.ChildNodes.Count >= 1)
@@ -478,7 +600,14 @@ namespace LiveSplit.Teslagrad2
                         if (segAttr != null)
                             segmentName = segAttr.Value;
 
-                        Splits.Add(new SplitEntry(type, scrollId, sceneName, segmentName));
+                        var entry = new SplitEntry(type, scrollId, sceneName, segmentName);
+                        if (TryParseFloat(child.Attributes?["PosX"]?.Value ?? "", out float posX))
+                            entry.PosX = posX;
+                        if (TryParseFloat(child.Attributes?["PosY"]?.Value ?? "", out float posY))
+                            entry.PosY = posY;
+                        if (TryParseFloat(child.Attributes?["Radius"]?.Value ?? "", out float radius) && radius > 0)
+                            entry.Radius = radius;
+                        Splits.Add(entry);
                     }
                 }
 
@@ -487,8 +616,24 @@ namespace LiveSplit.Teslagrad2
             }
 
             chkAutoReset.Checked = AutoReset;
+            chkShowPosition.Checked = ShowPosition;
+            chkShowScene.Checked = ShowScene;
+            chkShowVersion.Checked = ShowVersion;
             SyncWithRun();
             RebuildRows();
+        }
+
+        private static void AppendBool(XmlDocument document, XmlElement parent, string name, bool value)
+        {
+            var element = document.CreateElement(name);
+            element.InnerText = value.ToString();
+            parent.AppendChild(element);
+        }
+
+        // Missing in layouts saved before the option existed: off by default
+        private static bool ReadBool(XmlNode node, string name)
+        {
+            return bool.TryParse(node[name]?.InnerText, out bool value) && value;
         }
 
         #endregion

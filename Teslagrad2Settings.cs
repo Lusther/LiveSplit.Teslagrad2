@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml;
 using LiveSplit.Model;
@@ -10,6 +11,8 @@ namespace LiveSplit.Teslagrad2
 {
     public partial class Teslagrad2Settings : UserControl
     {
+        private ToolTip myToolTip;
+        
         public List<SplitEntry> Splits { get; set; }
         public bool AutoReset { get; set; }
 
@@ -35,12 +38,46 @@ namespace LiveSplit.Teslagrad2
         private void WireEvents()
         {
             chkAutoReset.CheckedChanged += (s, e) => AutoReset = chkAutoReset.Checked;
+            btnAutoAssignSplits.Click += OnAutoAssignSplitsClick;
+            btnResetAllSplitConditions.Click += OnResetAllSplitConditionsClick;
             this.Load += (s, e) => FitToParent();
             this.ParentChanged += (s, e) => FitToParent();
             this.SizeChanged += (s, e) => LayoutPanels();
         }
 
         private Control _subscribedParent;
+
+        private void OnAutoAssignSplitsClick(object sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                this,
+                "Auto-assign split conditions? This may replace your current assignments.",
+                "Auto-Assign Splits",
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Question);
+
+            if (result != DialogResult.OK)
+                return;
+
+            // Run the assignment logic here.
+            AutoAssignSplits();
+        }
+
+        private void OnResetAllSplitConditionsClick(object sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                this,
+                "Reset all split conditions to 'Manual Split'? This will clear any extra parameters.",
+                "Reset All Split Conditions",
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Question);
+
+            if (result != DialogResult.OK)
+                return;
+
+            // Reset all split conditions to ManualSplit
+            ResetAllSplitConditions();
+        }
 
         private void FitToParent()
         {
@@ -141,6 +178,85 @@ namespace LiveSplit.Teslagrad2
             }
 
             Splits = newSplits;
+            RebuildRows();
+        }
+
+        private void AutoAssignSplits()
+        {
+            var run = _state?.Run;
+            if (run == null || run.Count == 0) return;
+
+            // Try to fill in split parameters based on segment names
+            // case-insensitive match, trim removes leading/trailing whitespace
+            for (int i = 1; i < Splits.Count; i++)
+            {
+                var entry = Splits[i];
+
+                string segmentName = entry.SegmentName ?? $"Segment {i}";
+                segmentName = segmentName.Trim();
+
+                // Skip if the segment name is just the default placeholder
+                if (segmentName.Equals($"Segment {i}", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                bool matchFound = false;
+                foreach (var type in Enum.GetValues(typeof(SplitType)).Cast<SplitType>())
+                {
+                    foreach (string pattern in type.GetAutoAssignPatterns())
+                    {
+                        var match = Regex.Match(
+                            segmentName,
+                            pattern,
+                            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                        if (!match.Success)
+                            continue;
+
+                        ApplyAutoAssignmentMatch(entry, type, match);
+                        matchFound = true;
+                        break;
+                    }
+
+                    if (matchFound)
+                        break;
+                }
+
+                if (matchFound)
+                    continue;
+
+                entry.ResetToManual(clearSegmentName: false);
+            }
+
+            RebuildRows();
+        }
+
+        private static void ApplyAutoAssignmentMatch(SplitEntry entry, SplitType type, Match match)
+        {
+            entry.ResetToManual(clearSegmentName: false);
+            entry.Type = type;
+
+            if (type == SplitType.Scrolls)
+            {
+                int scrollId = 1;
+                if (int.TryParse(match.Groups["id"].Value, out int parsedScrollId)
+                    && parsedScrollId >= 1 && parsedScrollId <= 100)
+                {
+                    scrollId = parsedScrollId;
+                }
+
+                entry.ScrollId = scrollId;
+            }
+            else if (type == SplitType.SceneEntered)
+            {
+                entry.SceneName = match.Groups["scene"].Value;
+            }
+        }
+
+        private void ResetAllSplitConditions()
+        {
+            for (int i = 1; i < Splits.Count; i++)
+            {
+                Splits[i].ResetToManual(clearSegmentName: false);
+            }
             RebuildRows();
         }
 

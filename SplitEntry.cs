@@ -14,5 +14,14 @@ namespace LiveSplit.Teslagrad2
             SceneName = sceneName ?? "";
             SegmentName = segmentName;
         }
+
+        public void ResetToManual(bool clearSegmentName = true)
+        {
+            Type = SplitType.ManualSplit;
+            ScrollId = 0;
+            SceneName = "";
+            if (clearSegmentName)
+                SegmentName = null;
+        }
     }
 }

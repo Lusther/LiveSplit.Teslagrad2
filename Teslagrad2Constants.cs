@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace LiveSplit.Teslagrad2
 {
@@ -87,6 +89,8 @@ namespace LiveSplit.Teslagrad2
 
     public static class SplitTypeExtensions
     {
+        private static readonly Dictionary<SplitType, string[]> AutoAssignPatterns = CreateAutoAssignPatterns();
+
         public static string GetDisplayName(this SplitType type)
         {
             switch (type)
@@ -101,7 +105,7 @@ namespace LiveSplit.Teslagrad2
                 case SplitType.Axe: return "Axe";
                 case SplitType.BlinkWireAxe: return "Blink Wire Axe";
                 case SplitType.RedCloak: return "Red Cloak";
-                case SplitType.OmniBlink: return "OmniBlink";
+                case SplitType.OmniBlink: return "Omni Blink";
                 case SplitType.DoubleJump: return "Double Jump";
                 case SplitType.SecretsMap: return "Secrets Map";
                 case SplitType.Map: return "Map";
@@ -152,6 +156,117 @@ namespace LiveSplit.Teslagrad2
                 default:
                     return "";
             }
+        }
+
+        public static IEnumerable<string> GetAutoAssignPatterns(this SplitType type)
+        {
+            if (AutoAssignPatterns.TryGetValue(type, out var patterns))
+                return patterns;
+
+            return Enumerable.Empty<string>();
+        }
+
+        private static Dictionary<SplitType, string[]> CreateAutoAssignPatterns()
+        {
+            var patterns = new Dictionary<SplitType, string[]>();
+
+            foreach (SplitType type in System.Enum.GetValues(typeof(SplitType)))
+            {
+                switch (type)
+                {
+                    case SplitType.Scrolls:
+                        patterns[type] = new[]
+                        {
+                            // Match the prefix and capture the scroll number; trailing text is allowed.
+                            // (?:\s*|:\s*) means optional whitespace, or a colon with optional following whitespace.
+                            @"^\s*Scroll(?:\s*|:\s*)(?<id>\d+)",
+                            @"^\s*Scrolls(?:\s*|:\s*)(?<id>\d+)"
+                        };
+                        break;
+                    case SplitType.SceneEntered:
+                        patterns[type] = new[]
+                        {
+                            // Accept common scene prefixes and capture the remaining text as the scene name.
+                            // The separator can be whitespace or a colon; .+ requires a non-empty scene name.
+                            @"^\s*Scene\s+Entered(?:\s+|:\s*)(?<scene>.+)$",
+                            @"^\s*SceneEntered(?:\s+|:\s*)(?<scene>.+)$",
+                            @"^\s*Scene(?:\s+|:\s*)(?<scene>.+)$",
+                            @"^\s*Enter(?:\s+|:\s*)(?<scene>.+)$"
+                        };
+                        break;
+                    
+                    // Some common aliases
+                    case SplitType.BlueCloak:
+                        patterns[type] = new[]
+                        {
+                            CreateNamePattern(type.GetDisplayName()),
+                            CreateNamePattern("Blue Cape")
+                        };
+                        break;
+                    case SplitType.Waterblink:
+                        patterns[type] = new[]
+                        {
+                            CreateNamePattern(type.GetDisplayName()),
+                            CreateNamePattern("Wire Blink")
+                        };
+                        break;
+                    case SplitType.Mjolnir:
+                        patterns[type] = new[]
+                        {
+                            CreateNamePattern(type.GetDisplayName()),
+                            CreateNamePattern("Mjølnir")
+                        };
+                        break;
+                    case SplitType.BlinkWireAxe:
+                        patterns[type] = new[]
+                        {
+                            CreateNamePattern(type.GetDisplayName()),
+                            CreateNamePattern("Blink Axe")
+                        };
+                        break;
+                    case SplitType.RedCloak:
+                        patterns[type] = new[]
+                        {
+                            CreateNamePattern(type.GetDisplayName()),
+                            CreateNamePattern("Red Cape")
+                        };
+                        break;
+                    case SplitType.SecretsMap:
+                        patterns[type] = new[]
+                        {
+                            CreateNamePattern(type.GetDisplayName()),
+                            CreateNamePattern("Secret Map")
+                        };
+                        break;
+                    case SplitType.Hulder:
+                        patterns[type] = new[]
+                        {
+                            CreateNamePattern(type.GetDisplayName()),
+                            CreateNamePattern("Huldr")
+                        };
+                        break;
+                    
+                    
+                    // Default: Just use display name for skills and bosses
+                    default:
+                        if (type.GetCategory() == "Skills" || type.GetCategory() == "Bosses")
+                            patterns[type] = new[] { CreateNamePattern(type.GetDisplayName()) };
+                        break;
+                }
+            }
+
+            return patterns;
+        }
+
+        private static string CreateNamePattern(string name)
+        {
+            // Treat each name part literally, allow flexible whitespace between parts (including none),
+            // and accept either the whole name or a following word separated by whitespace.
+            string namePattern = string.Join(
+                @"\s*",
+                Regex.Split(name, @"\s+").Select(Regex.Escape));
+
+            return @"^\s*" + namePattern + @"(?:$|\s+)";
         }
     }
 }

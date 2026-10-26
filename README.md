@@ -8,6 +8,7 @@ A [LiveSplit](https://livesplit.org/) component autosplitter for [Teslagrad 2](h
 - Auto-reset on save slot deletion
 - Automatic splitting based on in-game events
 - Configurable split conditions via the component settings
+- Clickable button in settings to try to auto-assign split conditions based on the split names
 
 ## Installation
 

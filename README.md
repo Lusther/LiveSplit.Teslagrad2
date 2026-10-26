@@ -11,6 +11,13 @@ A [LiveSplit](https://livesplit.org/) component autosplitter for [Teslagrad 2](h
 
 ## Installation
 
+This component is automatically shipped with LiveSplit when running **Teslagrad 2**.
+1. Open/create splits with LiveSplit
+2. In LiveSplit, right-click > Edit Splits > Write or select **Teslagrad 2** in *Game Name*
+3. In the Edit Splits window, a line with `Auto Splitter for Teslagrad 2 (by Lusther)` now appears.
+Make sure to `Activate` it and set up your split triggers by clicking `Settings`
+
+You can also install the component manually by following these steps:
 1. Download the latest release
 2. Place the component DLL in your LiveSplit `Components` folder
 3. In LiveSplit, right-click > Edit Layout > Add the **Teslagrad 2** component

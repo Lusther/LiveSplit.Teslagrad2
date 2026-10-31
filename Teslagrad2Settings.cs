@@ -267,7 +267,11 @@ namespace LiveSplit.Teslagrad2
                     row.Controls.Add(lbl);
                     x += 24;
 
+                    // Make sure scrollID makes sense and matches the nud
                     int maxScrolls = Teslagrad2Constants.GetScrollTotalNumber();
+                    if (entry.ScrollId < 1 || entry.ScrollId > maxScrolls)
+                        entry.ScrollId = 1;
+
                     var nud = new NumericUpDown
                     {
                         Location = new Point(x, 3),
@@ -280,7 +284,7 @@ namespace LiveSplit.Teslagrad2
                     nud.ValueChanged += OnRowScrollIdChanged;
                     row.Controls.Add(nud);
                 }
-                if (entry.Type == SplitType.ScrollsByCollection)
+                else if (entry.Type == SplitType.ScrollsByCollection)
                 {
                     var collection = Teslagrad2Constants.GetScrollCollectionFromIDOrDefault(entry.ScrollId);
 
@@ -317,6 +321,8 @@ namespace LiveSplit.Teslagrad2
                         maxNumber = 1;
 
                     int currentNumber = Teslagrad2Constants.GetScrollNumberInCollection(entry.ScrollId, collection);
+                    // Make sure ScrollId is consistent
+                    entry.ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, currentNumber);
 
                     var nud = new NumericUpDown
                     {

@@ -409,15 +409,16 @@ namespace LiveSplit.Teslagrad2
 
             var oldType = Splits[index].Type;
             Splits[index].Type = item.Type;
-            if (item.Type.GetCategory() == SplitType.Scrolls.GetCategory() && Splits[index].ScrollId == 0)
-                Splits[index].ScrollId = 1;
-            if (item.Type.GetCategory() != SplitType.Scrolls.GetCategory())
+            if (item.Type.RequiresScrollId())
+                Splits[index].ScrollId = Math.Max(1, Math.Min(Teslagrad2Constants.GetScrollTotalNumber(), Splits[index].ScrollId));
+            else
                 Splits[index].ScrollId = 0;
+            
             if (item.Type != SplitType.SceneEntered)
                 Splits[index].SceneName = "";
 
-            bool hadExtra = oldType.GetCategory() == SplitType.Scrolls.GetCategory() || oldType == SplitType.SceneEntered;
-            bool needsExtra = item.Type.GetCategory() == SplitType.Scrolls.GetCategory() || item.Type == SplitType.SceneEntered;
+            bool hadExtra = oldType.RequiresScrollId() || oldType == SplitType.SceneEntered;
+            bool needsExtra = item.Type.RequiresScrollId() || item.Type == SplitType.SceneEntered;
             if (hadExtra || needsExtra)
                 RefreshRowControls(index);
         }
@@ -451,7 +452,7 @@ namespace LiveSplit.Teslagrad2
             var currentCollection = Teslagrad2Constants.GetScrollCollectionFromID(Splits[index].ScrollId);
             int currentNumber = Teslagrad2Constants.GetScrollNumberInCollection(Splits[index].ScrollId, currentCollection);
             int maxNumber = Teslagrad2Constants.GetScrollCollectionTotal(collection);
-            Splits[index].ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, Math.Min(currentNumber, maxNumber));
+            Splits[index].ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, Math.Min(maxNumber, currentNumber));
             RefreshRowControls(index);
         }
 
@@ -523,7 +524,7 @@ namespace LiveSplit.Teslagrad2
             {
                 var splitNode = document.CreateElement("Split");
                 splitNode.InnerText = entry.Type.ToString();
-                if (entry.Type.GetCategory() == SplitType.Scrolls.GetCategory()) 
+                if (entry.Type.RequiresScrollId()) 
                     splitNode.SetAttribute("ScrollId", entry.ScrollId.ToString());
                 if (entry.Type == SplitType.SceneEntered)
                     splitNode.SetAttribute("SceneName", entry.SceneName ?? "");

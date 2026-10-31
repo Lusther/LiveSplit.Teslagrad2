@@ -291,5 +291,10 @@ namespace LiveSplit.Teslagrad2
                     return "";
             }
         }
+
+        public static bool RequiresScrollId(this SplitType type)
+        {
+            return type == SplitType.Scrolls || type == SplitType.ScrollsByCollection;
+        }
     }
 }

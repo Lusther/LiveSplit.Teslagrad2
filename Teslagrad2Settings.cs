@@ -278,7 +278,7 @@ namespace LiveSplit.Teslagrad2
                         Size = new Size(50, 21),
                         Minimum = 1,
                         Maximum = maxScrolls,
-                        Value = Math.Max(1, Math.Min(maxScrolls, entry.ScrollId)),
+                        Value = entry.ScrollId,
                         Tag = index
                     };
                     nud.ValueChanged += OnRowScrollIdChanged;
@@ -286,8 +286,17 @@ namespace LiveSplit.Teslagrad2
                 }
                 else if (entry.Type == SplitType.ScrollsByCollection)
                 {
-                    var collection = Teslagrad2Constants.GetScrollCollectionFromIDOrDefault(entry.ScrollId);
+                    // Scroll information
+                    ScrollCollection collection;
+                    int currentNumber;
+                    Teslagrad2Constants.ScrollIdToCollectionAndNumber(entry.ScrollId, out collection, out currentNumber);
+                    
+                    // Make sure ScrollId is consistent (if it was invalid before)
+                    entry.ScrollId = Teslagrad2Constants.ScrollCollectionAndNumberToScrollId(collection, currentNumber);
 
+                    int maxNumber = Teslagrad2Constants.ScrollCollectionTotals[collection];
+
+                    // Row controls
                     var collectionCombo = new ComboBox
                     {
                         DropDownStyle = ComboBoxStyle.DropDownList,
@@ -297,8 +306,6 @@ namespace LiveSplit.Teslagrad2
                     };
                     foreach (ScrollCollection collectionItem in Enum.GetValues(typeof(ScrollCollection)))
                     {
-                        if (collectionItem == ScrollCollection.None)
-                            continue;
                         collectionCombo.Items.Add(collectionItem);
                     }
                     collectionCombo.SelectedItem = collection;
@@ -316,21 +323,13 @@ namespace LiveSplit.Teslagrad2
                     row.Controls.Add(lbl);
                     x += 25;
 
-                    int maxNumber = Teslagrad2Constants.GetScrollCollectionTotal(collection);
-                    if (maxNumber < 1)
-                        maxNumber = 1;
-
-                    int currentNumber = Teslagrad2Constants.GetScrollNumberInCollection(entry.ScrollId, collection);
-                    // Make sure ScrollId is consistent
-                    entry.ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, currentNumber);
-
                     var nud = new NumericUpDown
                     {
                         Location = new Point(x, 3),
                         Size = new Size(40, 21),
                         Minimum = 1,
                         Maximum = maxNumber,
-                        Value = Math.Max(1, Math.Min(maxNumber, currentNumber)),
+                        Value = currentNumber,
                         Tag = index
                     };
                     nud.ValueChanged += OnRowScrollNumberInCollectionChanged;
@@ -437,8 +436,10 @@ namespace LiveSplit.Teslagrad2
             int index = (int)nud.Tag;
             if (index < 0 || index >= Splits.Count) return;
 
-            var collection = Teslagrad2Constants.GetScrollCollectionFromIDOrDefault(Splits[index].ScrollId);
-            Splits[index].ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, (int)nud.Value);
+            // Retrieve unchanged collection
+            Teslagrad2Constants.ScrollIdToCollectionAndNumber(Splits[index].ScrollId, out var collection, out _);
+            // Update ScrollId based on new number in collection
+            Splits[index].ScrollId = Teslagrad2Constants.ScrollCollectionAndNumberToScrollId(collection, (int)nud.Value);
         }
 
         private void OnRowScrollCollectionChanged(object sender, EventArgs e)
@@ -449,10 +450,12 @@ namespace LiveSplit.Teslagrad2
             if (combo.SelectedItem == null) return;
 
             var collection = (ScrollCollection)combo.SelectedItem;
-            var currentCollection = Teslagrad2Constants.GetScrollCollectionFromID(Splits[index].ScrollId);
-            int currentNumber = Teslagrad2Constants.GetScrollNumberInCollection(Splits[index].ScrollId, currentCollection);
-            int maxNumber = Teslagrad2Constants.GetScrollCollectionTotal(collection);
-            Splits[index].ScrollId = Teslagrad2Constants.GetScrollIdForCollectionNumber(collection, Math.Min(maxNumber, currentNumber));
+            int currentNumber;
+            // Retrieve unchanged number in collection
+            Teslagrad2Constants.ScrollIdToCollectionAndNumber(Splits[index].ScrollId, out _, out currentNumber);
+            // Update ScrollId based on new collection and unchanged number (capped to max)
+            int maxNumber = Teslagrad2Constants.ScrollCollectionTotals[collection];
+            Splits[index].ScrollId = Teslagrad2Constants.ScrollCollectionAndNumberToScrollId(collection, Math.Min(maxNumber, currentNumber));
             RefreshRowControls(index);
         }
 

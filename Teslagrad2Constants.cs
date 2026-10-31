@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using LiveSplit.UI.Components;
@@ -28,27 +29,15 @@ namespace LiveSplit.Teslagrad2
 
     public enum ScrollCollection
     {
-        Vikings,
-        Teslamancers,
-        Goo,
-        Clash,
-        Huldr,
-        Lumina,
-        None
-    }
-
-    public class ScrollCollectionTotal
-    {
-        public int CollectionTotal {get; }
-        public int CumulatedTotalBefore {get; }
-        public int CumulatedTotalAfter {get; }
-
-        public ScrollCollectionTotal(int collectionTotal, int cumulatedTotalBefore, int cumulatedTotalAfter)
-        {
-            CollectionTotal = collectionTotal;
-            CumulatedTotalBefore = cumulatedTotalBefore;
-            CumulatedTotalAfter = cumulatedTotalAfter;
-        }
+        // We need the right order in the enum, in order to compute the cumulative totals correctly. 
+        // The order is based on the order of the scrolls in the game.
+        // We make the numbering explicit to avoid any accidental changes in the future.
+        Vikings = 1,
+        Teslamancers = 2,
+        Goo = 3,
+        Clash = 4,
+        Huldr = 5,
+        Lumina = 6
     }
 
 
@@ -83,105 +72,84 @@ namespace LiveSplit.Teslagrad2
             }
         }
 
-        public static readonly Dictionary<ScrollCollection, ScrollCollectionTotal> ScrollCollectionTotals = new Dictionary<ScrollCollection, ScrollCollectionTotal>
+        // Make sure it's consistent with the ScrollCollection enum
+        public static readonly Dictionary<ScrollCollection, int> ScrollCollectionTotals = new Dictionary<ScrollCollection, int>
         {
-            { ScrollCollection.Vikings,       new ScrollCollectionTotal( 9,  0,  9) },
-            { ScrollCollection.Teslamancers,  new ScrollCollectionTotal( 6,  9, 15) },
-            { ScrollCollection.Goo,           new ScrollCollectionTotal(15, 15, 30) },
-            { ScrollCollection.Clash,         new ScrollCollectionTotal(27, 30, 57) },
-            { ScrollCollection.Huldr,         new ScrollCollectionTotal(12, 57, 69) },
-            { ScrollCollection.Lumina,        new ScrollCollectionTotal(12, 69, 81) }
-            // Note: The None case is dealt with in the helpers, which have default values if totals are not found
+            { ScrollCollection.Vikings,        9 },
+            { ScrollCollection.Teslamancers,   6 },
+            { ScrollCollection.Goo,           15 },
+            { ScrollCollection.Clash,         27 },
+            { ScrollCollection.Huldr,         12 },
+            { ScrollCollection.Lumina,        12 }
         };
 
-        public static readonly int TotalScrollCount = ScrollCollectionTotals.Values.Sum(t => t.CollectionTotal);
-
-        static Teslagrad2Constants()
-        {
-            ValidateScrollCollectionTotals();
-        }
-
-        private static void ValidateScrollCollectionTotals()
-        {
-            int runningTotal = 0;
-            bool valid = true;
-
-            foreach (var entry in ScrollCollectionTotals.OrderBy(e => e.Value.CumulatedTotalBefore))
-            {
-                var totals = entry.Value;
-                if (totals.CumulatedTotalBefore != runningTotal)
-                {
-                    Log.Error($"Invalid scroll totals for {entry.Key}: expected CumulatedTotalBefore={runningTotal}, got {totals.CumulatedTotalBefore}.");
-                    valid = false;
-                }
-                if (totals.CumulatedTotalAfter != runningTotal + totals.CollectionTotal)
-                {
-                    Log.Error($"Invalid scroll totals for {entry.Key}: expected CumulatedTotalAfter={runningTotal + totals.CollectionTotal}, got {totals.CumulatedTotalAfter}.");
-                    valid = false;
-                }
-                runningTotal = totals.CumulatedTotalAfter;
-            }
-
-            if (runningTotal != TotalScrollCount)
-            {
-                Log.Error($"Invalid total scroll count: computed {runningTotal}, expected {TotalScrollCount}.");
-                valid = false;
-            }
-
-            if (!valid)
-            {
-                Log.Error("Scroll collection totals are inconsistent. Check Teslagrad2Constants.ScrollCollectionTotals.");
-            }
-            else
-            {
-                Log.Info("Scroll collection totals validated successfully.");
-            }
-        }
-
-        public static ScrollCollection GetScrollCollectionFromID(int scrollId)
-        {
-            foreach (var collection in ScrollCollectionTotals)
-            {
-                if (scrollId > collection.Value.CumulatedTotalBefore && scrollId <= collection.Value.CumulatedTotalAfter)
-                    return collection.Key;
-            }
-            return ScrollCollection.None;
-        }
-
-        public static ScrollCollection GetScrollCollectionFromIDOrDefault(int scrollId, ScrollCollection defaultCollection = ScrollCollection.Vikings)
-        {
-            var collection = GetScrollCollectionFromID(scrollId);
-            return collection == ScrollCollection.None ? defaultCollection : collection;
-        }
+        public static readonly int TotalScrollCount = ScrollCollectionTotals.Values.Sum();
 
         public static int GetScrollTotalNumber()
         {
             return TotalScrollCount;
         }
 
-        public static int GetScrollCollectionTotal(ScrollCollection collection)
+        // Helpers to get cumulated totals
+        public static int GetScrollCumulatedTotalBefore(ScrollCollection collection)
         {
-            if (ScrollCollectionTotals.TryGetValue(collection, out var totals))
-                return totals.CollectionTotal;
-            return 0;
+            int total = 0;
+            // IMPORTANT: Loop through the enum values in order
+            foreach (ScrollCollection coll in Enum.GetValues(typeof(ScrollCollection)))
+            {
+                if (coll == collection)
+                    break;
+                total += ScrollCollectionTotals[coll];
+            }
+            return total;
         }
 
-        public static int GetScrollNumberInCollection(int scrollId, ScrollCollection collection, int defaultNumber = 1)
+        public static int GetScrollCumulatedTotalAfter(ScrollCollection collection)
         {
-            if (!ScrollCollectionTotals.TryGetValue(collection, out var totals))
-                return defaultNumber;
-            int number = scrollId - totals.CumulatedTotalBefore;
-            if (number < 1 || number > totals.CollectionTotal)
-                return defaultNumber;
-            return number;
+            return GetScrollCumulatedTotalBefore(collection) + ScrollCollectionTotals[collection];
         }
 
-        public static int GetScrollIdForCollectionNumber(ScrollCollection collection, int number)
+        // Helpers to translate between scroll IDs and collections
+        public static void ScrollIdToCollectionAndNumber(int scrollId, out ScrollCollection collection, out int number,
+            ScrollCollection defaultCollection = ScrollCollection.Vikings, int defaultNumber = 1)
         {
-            if (!ScrollCollectionTotals.TryGetValue(collection, out var totals))
-                return number;
-            number = Max(1, Min(number, totals.CollectionTotal));
-            return totals.CumulatedTotalBefore + number;
+            number = scrollId;
+            
+            // Check validity of scrollId
+            if (scrollId < 1 || scrollId > TotalScrollCount)
+            {
+                Log.Info($"Received invalid ScrollId {scrollId}. Must be between 1 and {TotalScrollCount}.\n"
+                        +$"Defaulting to collection {defaultCollection} and number {defaultNumber}.");
+                collection = defaultCollection;
+                number = defaultNumber;
+            }
+
+            foreach (ScrollCollection coll in Enum.GetValues(typeof(ScrollCollection)))
+            {
+                if (number >= 1 && number <= ScrollCollectionTotals[coll])
+                {
+                    collection = coll;
+                    return;
+                }
+                number -= ScrollCollectionTotals[coll];
+            }
+
+            // Failure (shouldn't happen)
+            Log.Error($"Failed to convert ScrollId {scrollId} to collection and number.\n"
+                    +$"Defaulting to collection {defaultCollection} and number {defaultNumber}.");
+            collection = defaultCollection;
+            number = defaultNumber;
+        }
+
+        public static int ScrollCollectionAndNumberToScrollId(ScrollCollection collection, int number, int defaultNumber = 1)
+        {
+            if (number < 1 || number > ScrollCollectionTotals[collection])
+            {
+                Log.Info($"Received invalid number {number} for collection {collection}. Must be between 1 and {ScrollCollectionTotals[collection]}.\n"
+                        +$"Defaulting to number {defaultNumber}.");
+                number = defaultNumber;
+            }
+            return GetScrollCumulatedTotalBefore(collection) + number;
         }
     }
 

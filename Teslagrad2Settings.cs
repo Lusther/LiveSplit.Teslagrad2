@@ -224,7 +224,9 @@ namespace LiveSplit.Teslagrad2
             else
             {
                 // Segment name label
-                string segmentName = entry.SegmentName ?? $"Segment {index}";
+                string segmentName = string.IsNullOrWhiteSpace(entry.SegmentName)
+                    ? $"Segment {index}"
+                    : entry.SegmentName;
                 var nameLabel = new Label
                 {
                     Text = segmentName,
